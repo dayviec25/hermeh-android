@@ -1,4 +1,4 @@
-package com.hermex.android.feature.skills
+package com.hermex.android.core.designsystem
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -41,10 +41,10 @@ import com.hermex.android.core.designsystem.HermexTheme
 import com.hermex.android.core.designsystem.glassSurface
 
 private val CapsuleShape = RoundedCornerShape(50)
-internal val CardShape = RoundedCornerShape(18.dp)
+val CardShape = RoundedCornerShape(18.dp)
 
 @Composable
-internal fun PanelScaffold(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+fun PanelScaffold(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier
             .fillMaxSize()
@@ -55,7 +55,7 @@ internal fun PanelScaffold(modifier: Modifier = Modifier, content: @Composable C
 }
 
 @Composable
-internal fun PanelTopBar(
+fun PanelTopBar(
     title: String,
     onBack: () -> Unit,
     backTag: String,
@@ -86,7 +86,7 @@ internal fun PanelTopBar(
 }
 
 @Composable
-internal fun BarIcon(icon: ImageVector, description: String, tag: String, enabled: Boolean = true, busy: Boolean = false, onClick: () -> Unit) {
+fun BarIcon(icon: ImageVector, description: String, tag: String, enabled: Boolean = true, busy: Boolean = false, onClick: () -> Unit) {
     val colors = HermexTheme.colors
     Box(
         Modifier.size(44.dp).clip(CapsuleShape).clickable(enabled = enabled && !busy, onClick = onClick).testTag(tag),
@@ -101,7 +101,7 @@ internal fun BarIcon(icon: ImageVector, description: String, tag: String, enable
 }
 
 @Composable
-internal fun SectionCard(
+fun SectionCard(
     modifier: Modifier = Modifier,
     title: String? = null,
     content: @Composable ColumnScope.() -> Unit,
@@ -125,7 +125,7 @@ internal fun SectionCard(
 }
 
 @Composable
-internal fun StatusBadge(text: String, color: Color, modifier: Modifier = Modifier) {
+fun StatusBadge(text: String, color: Color, modifier: Modifier = Modifier) {
     Text(
         text,
         color = color,
@@ -137,7 +137,7 @@ internal fun StatusBadge(text: String, color: Color, modifier: Modifier = Modifi
 }
 
 @Composable
-internal fun Segmented(
+fun Segmented(
     options: List<Pair<String, String>>,
     selected: String,
     onSelect: (String) -> Unit,
@@ -171,7 +171,7 @@ internal fun Segmented(
 }
 
 @Composable
-internal fun ContentUnavailable(
+fun ContentUnavailable(
     icon: ImageVector,
     title: String,
     message: String,
@@ -209,7 +209,7 @@ internal fun ContentUnavailable(
 }
 
 @Composable
-internal fun LoadingState(text: String, modifier: Modifier = Modifier) {
+fun LoadingState(text: String, modifier: Modifier = Modifier) {
     val colors = HermexTheme.colors
     Column(modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         CircularProgressIndicator(Modifier.size(28.dp), color = colors.secondaryLabel, strokeWidth = 2.5.dp)
@@ -219,7 +219,7 @@ internal fun LoadingState(text: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-internal fun LabelValueRow(label: String, value: String, modifier: Modifier = Modifier, labelWidth: Int = 82) {
+fun LabelValueRow(label: String, value: String, modifier: Modifier = Modifier, labelWidth: Int = 82) {
     val colors = HermexTheme.colors
     Row(modifier.fillMaxWidth().padding(vertical = 2.dp)) {
         Text(label, color = colors.secondaryLabel, fontSize = 14.sp, modifier = Modifier.width(labelWidth.dp))
