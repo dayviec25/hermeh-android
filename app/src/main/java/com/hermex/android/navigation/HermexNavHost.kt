@@ -2,6 +2,7 @@ package com.hermex.android.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.createSavedStateHandle
@@ -16,11 +17,20 @@ import com.hermex.android.AppGraph
 import com.hermex.android.core.data.AppearancePrefs
 import com.hermex.android.core.data.LogoColor
 import com.hermex.android.core.data.ThemeMode
+import com.hermex.android.core.data.BotsRepository
+import com.hermex.android.core.data.KanbanRepository
 import com.hermex.android.core.model.AuthState
+import com.hermex.android.core.model.CardId
+import com.hermex.android.feature.bots.BotsRoute
+import com.hermex.android.feature.bots.BotsViewModel
 import com.hermex.android.feature.chat.ChatRoute
 import com.hermex.android.feature.chat.ChatViewModel
 import com.hermex.android.feature.home.HomeRoute
+import com.hermex.android.feature.home.HomeDestination
 import com.hermex.android.feature.home.HomeViewModel
+import com.hermex.android.feature.kanban.CardDetailViewModel
+import com.hermex.android.feature.kanban.KanbanRoute
+import com.hermex.android.feature.kanban.KanbanViewModel
 import com.hermex.android.feature.placeholder.PlaceholderScreen
 import com.hermex.android.feature.settings.SettingsScreen
 import kotlinx.coroutines.launch
@@ -33,6 +43,10 @@ import kotlinx.serialization.Serializable
 @Serializable data object SettingsRouteKey
 
 @Serializable data class PlaceholderRouteKey(val title: String)
+
+@Serializable data object KanbanRouteKey
+
+@Serializable data object BotsRouteKey
 
 @Composable
 fun HermexNavHost(graph: AppGraph, auth: AuthState.SignedIn) {
@@ -51,7 +65,13 @@ fun HermexNavHost(graph: AppGraph, auth: AuthState.SignedIn) {
                 initials = initials(auth.user.displayName.ifBlank { auth.server.username }),
                 onOpenSession = { row -> nav.navigate(ChatRouteKey(row.key, row.profile, row.title)) },
                 onNewChat = { nav.navigate(ChatRouteKey(null, profile, null)) },
-                onDestination = { nav.navigate(PlaceholderRouteKey(it.title)) },
+                onDestination = {
+                    when (it) {
+                        HomeDestination.Kanban -> nav.navigate(KanbanRouteKey)
+                        HomeDestination.Bots -> nav.navigate(BotsRouteKey)
+                        else -> nav.navigate(PlaceholderRouteKey(it.title))
+                    }
+                },
                 onSearch = { nav.navigate(PlaceholderRouteKey("Search")) },
                 onSettings = { nav.navigate(SettingsRouteKey) },
             )
@@ -80,6 +100,34 @@ fun HermexNavHost(graph: AppGraph, auth: AuthState.SignedIn) {
                 onTheme = { scope.launch { graph.store.setTheme(it) } },
                 onLogo = { scope.launch { graph.store.setLogo(it) } },
                 onSignOut = { graph.appScope.launch { graph.signOut() } },
+            )
+        }
+        composable<KanbanRouteKey> {
+            val kanban = remember { KanbanRepository(graph.auth) }
+            val viewModel: KanbanViewModel = viewModel(
+                factory = viewModelFactory { initializer { KanbanViewModel(createSavedStateHandle(), kanban) } },
+            )
+            KanbanRoute(
+                viewModel = viewModel,
+                detailViewModel = { board, cardId ->
+                    viewModel(
+                        key = "card-$board-$cardId",
+                        factory = viewModelFactory {
+                            initializer { CardDetailViewModel(createSavedStateHandle(), kanban, board, CardId(cardId)) }
+                        },
+                    )
+                },
+                onBack = { nav.popBackStack() },
+            )
+        }
+        composable<BotsRouteKey> {
+            val viewModel: BotsViewModel = viewModel(
+                factory = viewModelFactory { initializer { BotsViewModel(createSavedStateHandle(), BotsRepository(graph.gateway)) } },
+            )
+            BotsRoute(
+                viewModel = viewModel,
+                onBack = { nav.popBackStack() },
+                onOpenChat = { target -> nav.navigate(ChatRouteKey(target.key.value, target.profile.value, target.title)) },
             )
         }
         composable<PlaceholderRouteKey> { entry ->
