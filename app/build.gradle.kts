@@ -8,13 +8,13 @@ plugins {
 }
 
 android {
-    namespace = "com.hermex.android"
+    namespace = "com.hermeh.android"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.hermex.android"
+        applicationId = "com.hermeh.android"
         minSdk = 28
         targetSdk = 36
         versionCode = 1

@@ -1,6 +1,6 @@
-# Hermex for Android
+# Hermeh for Android
 
-A native Android client for a self-hosted [Hermes agent](https://github.com/NousResearch/hermes-agent) dashboard. It ports [Hermex](https://github.com/uzairansaruzi/hermex), the iPhone app, to Kotlin and Jetpack Compose, with the same design and the same wire protocol.
+A native Android client for a self-hosted [Hermes agent](https://github.com/NousResearch/hermes-agent) dashboard. It started as a port of [Hermex](https://github.com/uzairansaruzi/hermex), the iPhone app, to Kotlin and Jetpack Compose, and speaks the same wire protocol. Hermeh has its own design, built around a companion mascot.
 
 The phone is only the control plane. The agent, its tools and your data stay on your machine. The app talks only to your server.
 
@@ -31,13 +31,13 @@ It supports the Hermes dashboard (`hermes dashboard`), version 0.21.3 or later. 
 
 ## Install
 
-Download `hermex-<version>.apk` to the phone, open it and allow installs from that source. Or install it with adb:
+Download `hermeh-<version>.apk` to the phone, open it and allow installs from that source. Or install it with adb:
 
 ```sh
-adb install -r dist/hermex-0.1.0.apk
+adb install -r dist/hermeh-0.1.0.apk
 ```
 
-Open Hermex, tap **Already have a server?**, and enter the URL, username and password.
+Open Hermeh, tap **Already have a server?**, and enter the URL, username and password.
 
 ## Build from source
 
@@ -53,7 +53,7 @@ To sign release builds, create `keystore.properties` in the repo root. It's giti
 ```properties
 storeFile=/absolute/path/to/release.jks
 storePassword=...
-keyAlias=hermex
+keyAlias=hermeh
 keyPassword=...
 ```
 
@@ -69,12 +69,12 @@ Every stub turn says "Let me run a quick check.", runs a `terminal` call that wa
 
 ## Layout
 
-- `app/src/main/java/com/hermex/android/core/network`: REST client and the gateway WebSocket (JSON-RPC, ticket auth, ping, reconnect)
+- `app/src/main/java/com/hermeh/android/core/network`: REST client and the gateway WebSocket (JSON-RPC, ticket auth, ping, reconnect)
 - `core/data`: repositories, encrypted credentials and cookies, Room cache
-- `core/designsystem`: Hermex theme, wordmark, shared panel chrome
+- `core/designsystem`: Hermeh theme, mascot, wordmark, shared panel chrome
 - `feature/*`: one package per screen
 - `docs/spec`: the protocol spec, live captures, design spec and data shape this port was built from
 
 ## Credits
 
-Design, protocol and product by [Hermex](https://github.com/uzairansaruzi/hermex) (MIT). The file-type icons are Pierre's `@pierre/trees` icons (Apache-2.0), plus six from T3 Code (MIT). This is an independent port and isn't affiliated with the Hermex or Hermes projects.
+Original design, protocol and product by [Hermex](https://github.com/uzairansaruzi/hermex) (MIT). The file-type icons are Pierre's `@pierre/trees` icons (Apache-2.0), plus six from T3 Code (MIT). This is an independent port and isn't affiliated with the Hermex or Hermes projects. Hermeh installs as `com.hermeh.android`, separate from Hermex 0.1.0 builds (`com.hermex.android`).

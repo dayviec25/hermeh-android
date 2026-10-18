@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "hermex-android"
+rootProject.name = "hermeh-android"
 include(":app")
