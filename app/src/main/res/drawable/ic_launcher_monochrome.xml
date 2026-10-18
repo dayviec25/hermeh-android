@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group android:scaleX="0.62" android:scaleY="0.62" android:translateX="23" android:translateY="18.04">
+        <group>
+            <group android:rotation="-8" android:pivotX="18.18" android:pivotY="42.3">
+                <path android:fillColor="#FFFFFFFF" android:pathData="M6.18,42.30a7.40,3.50 0 1,0 14.80,0a7.40,3.50 0 1,0 -14.80,0Z" />
+            </group>
+            <group android:rotation="16" android:pivotX="18.18" android:pivotY="42.3">
+                <path android:fillColor="#FFFFFFFF" android:pathData="M2.18,42.30a9.56,3.90 0 1,0 19.12,0a9.56,3.90 0 1,0 -19.12,0Z" />
+            </group>
+            <group android:rotation="40" android:pivotX="18.18" android:pivotY="42.3">
+                <path android:fillColor="#FFFFFFFF" android:pathData="M-1.82,42.30a11.70,4.25 0 1,0 23.40,0a11.70,4.25 0 1,0 -23.40,0Z" />
+            </group>
+        </group>
+        <group android:scaleX="-1" android:pivotX="50">
+            <group android:rotation="-8" android:pivotX="18.18" android:pivotY="42.3">
+                <path android:fillColor="#FFFFFFFF" android:pathData="M6.18,42.30a7.40,3.50 0 1,0 14.80,0a7.40,3.50 0 1,0 -14.80,0Z" />
+            </group>
+            <group android:rotation="16" android:pivotX="18.18" android:pivotY="42.3">
+                <path android:fillColor="#FFFFFFFF" android:pathData="M2.18,42.30a9.56,3.90 0 1,0 19.12,0a9.56,3.90 0 1,0 -19.12,0Z" />
+            </group>
+            <group android:rotation="40" android:pivotX="18.18" android:pivotY="42.3">
+                <path android:fillColor="#FFFFFFFF" android:pathData="M-1.82,42.30a11.70,4.25 0 1,0 23.40,0a11.70,4.25 0 1,0 -23.40,0Z" />
+            </group>
+        </group>
+        <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd" android:pathData="M45.56,21.74H54.44A32.56,32.2 0 0 1 87,53.94V58.06A32.56,32.2 0 0 1 54.44,90.26H45.56A32.56,32.2 0 0 1 13,58.06V53.94A32.56,32.2 0 0 1 45.56,21.74ZM31.69,53.94a4.25,5.50 0 1,0 8.50,0a4.25,5.50 0 1,0 -8.50,0ZM59.81,53.94a4.25,5.50 0 1,0 8.50,0a4.25,5.50 0 1,0 -8.50,0ZM44.2,64.2Q50,70.6 55.8,64.2Q50,67.4 44.2,64.2Z" />
+    </group>
+</vector>
