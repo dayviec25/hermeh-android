@@ -39,7 +39,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,6 +55,7 @@ import com.hermex.android.core.designsystem.HermexTheme
 import com.hermex.android.core.designsystem.HermexWordmark
 import com.hermex.android.core.model.AuthState
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun SettingsScreen(
     auth: AuthState.SignedIn,
@@ -67,7 +71,7 @@ fun SettingsScreen(
     Column(
         modifier
             .fillMaxSize()
-            .background(colors.secondaryBackground)
+            .background(if (colors.isDark) colors.background else colors.secondaryBackground)
             .windowInsetsPadding(WindowInsets.statusBars),
     ) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -92,7 +96,7 @@ fun SettingsScreen(
                 InfoRow("Hermes version", auth.hostVersion.ifBlank { "Unknown" })
             }
             Section("Appearance") {
-                Row(Modifier.fillMaxWidth().padding(4.dp).clip(RoundedCornerShape(10.dp)).background(colors.secondaryBackground).padding(3.dp)) {
+                Row(Modifier.fillMaxWidth().padding(4.dp).clip(RoundedCornerShape(10.dp)).background(if (colors.isDark) colors.background else colors.secondaryBackground).padding(3.dp)) {
                     ThemeMode.entries.forEach { mode ->
                         val selected = appearance.theme == mode
                         Box(
@@ -167,7 +171,7 @@ fun SettingsScreen(
                 TextButton(onClick = {
                     confirm = false
                     onSignOut()
-                }, modifier = Modifier.testTag("settings.signOut.confirm")) { Text("Sign Out", color = colors.danger) }
+                }, modifier = Modifier.semantics { testTagsAsResourceId = true }.testTag("settings.signOut.confirm")) { Text("Sign Out", color = colors.danger) }
             },
             dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel") } },
         )
@@ -182,7 +186,7 @@ private fun Section(title: String?, content: @Composable ColumnScope.() -> Unit)
             Text(title.uppercase(), color = colors.secondaryLabel, fontSize = 12.sp, modifier = Modifier.padding(start = 16.dp))
         }
         Column(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(colors.tertiaryBackground),
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(if (colors.isDark) colors.secondaryBackground else colors.tertiaryBackground),
             content = content,
         )
     }

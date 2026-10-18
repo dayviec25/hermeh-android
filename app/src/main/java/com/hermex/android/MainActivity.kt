@@ -35,7 +35,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val appearance by graph.store.appearance.collectAsStateWithLifecycle(AppearancePrefs(ThemeMode.System, LogoColor.Yellow))
             val auth by graph.auth.state.collectAsStateWithLifecycle()
-            val onboarded by graph.store.onboarded.collectAsStateWithLifecycle(false)
+            val onboarded by graph.store.onboarded.collectAsStateWithLifecycle<Boolean?>(null)
             val signedIn = auth is AuthState.SignedIn
             val dark = when {
                 !signedIn -> true
@@ -56,14 +56,23 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun Root(auth: AuthState?, onboarded: Boolean, graph: AppGraph) {
+private fun Root(auth: AuthState?, onboarded: Boolean?, graph: AppGraph) {
     Box(
         modifier = Modifier
             .fillMaxSize()
             .semantics { testTagsAsResourceId = true },
     ) {
+        when {
+            auth == null || onboarded == null -> Box(Modifier.fillMaxSize().background(Onboarding.background))
+            else -> RootContent(auth, onboarded, graph)
+        }
+    }
+}
+
+@Composable
+private fun RootContent(auth: AuthState, onboarded: Boolean, graph: AppGraph) {
+    Box(Modifier.fillMaxSize()) {
         when (auth) {
-            null -> Box(Modifier.fillMaxSize().background(Onboarding.background))
             AuthState.Unconfigured -> OnboardingRoute(graph = graph, startAtConnect = onboarded, initialMessage = null)
             is AuthState.SignedOut -> OnboardingRoute(graph = graph, startAtConnect = true, initialMessage = auth.message, server = auth.server)
             is AuthState.SignedIn -> HermexNavHost(graph = graph, auth = auth)

@@ -109,7 +109,10 @@ class ChatViewModel(
         val ready = _state.value as? ChatUiState.Ready ?: return
         val text = ready.input.trim()
         if (text.isEmpty()) return
-        updateReady { it.copy(input = "", chat = it.chat.addLocalUser(text, Instant.now())) }
+        updateReady {
+            val chat = it.chat.addLocalUser(text, Instant.now())
+            it.copy(input = "", chat = if (chat.title.isNullOrBlank()) chat.copy(title = text.lineSequence().first().take(80)) else chat)
+        }
         viewModelScope.launch {
             try {
                 val id = ensureSession()

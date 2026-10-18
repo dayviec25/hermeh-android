@@ -33,7 +33,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Warning
@@ -59,6 +58,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -211,25 +214,24 @@ private fun ChatHeader(title: String, subtitle: String, onBack: () -> Unit) {
             )
             if (subtitle.isNotEmpty()) Text(subtitle, color = colors.secondaryLabel, fontSize = 12.sp, maxLines = 1)
         }
-        GlassCircleButton(Icons.Filled.Folder, "Workspace", {}, Modifier.testTag("chat.workspace"))
+        GlassCircleButton(painterResource(R.drawable.ic_lucide_folder), "Workspace", {}, Modifier.testTag("chat.workspace"))
     }
 }
 
 @Composable
 private fun Transcript(items: List<TranscriptItem>, modifier: Modifier) {
     val listState = rememberLazyListState()
-    val last = items.lastOrNull()
-    val lastLength = (last as? TranscriptItem.Assistant)?.markdown?.length ?: 0
-    LaunchedEffect(items.size, lastLength) {
-        if (items.isNotEmpty()) listState.animateScrollToItem(items.lastIndex, scrollOffset = Int.MAX_VALUE / 2)
+    LaunchedEffect(items.size) {
+        if (listState.firstVisibleItemIndex <= 1) listState.scrollToItem(0)
     }
     LazyColumn(
         state = listState,
+        reverseLayout = true,
         modifier = modifier.fillMaxWidth().testTag("chat.transcript"),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.Bottom),
     ) {
-        items(items, key = { it.id }, contentType = { it::class.simpleName }) { item ->
+        items(items.asReversed(), key = { it.id }, contentType = { it::class.simpleName }) { item ->
             when (item) {
                 is TranscriptItem.User -> UserBubble(item)
                 is TranscriptItem.Assistant -> AssistantText(item, Modifier.testTag("chat.assistant"))
@@ -412,6 +414,7 @@ private fun RunStatusCapsule(run: RunState) {
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun Composer(
     state: ChatUiState.Ready,
@@ -424,6 +427,11 @@ private fun Composer(
     val colors = HermexTheme.colors
     val running = state.chat.isRunning
     val canSend = state.input.isNotBlank()
+    val focus = LocalFocusManager.current
+    val submit = {
+        focus.clearFocus()
+        onSend()
+    }
     var reasoningMenu by remember { mutableStateOf(false) }
     Column(
         Modifier
@@ -467,7 +475,11 @@ private fun Composer(
                         onClick = { reasoningMenu = true },
                         modifier = Modifier.testTag("chat.reasoningChip"),
                     )
-                    DropdownMenu(expanded = reasoningMenu, onDismissRequest = { reasoningMenu = false }) {
+                    DropdownMenu(
+                        expanded = reasoningMenu,
+                        onDismissRequest = { reasoningMenu = false },
+                        modifier = Modifier.semantics { testTagsAsResourceId = true },
+                    ) {
                         REASONING_LEVELS.forEach { level ->
                             DropdownMenuItem(
                                 text = { Text(reasoningLabel(level)) },
@@ -506,7 +518,7 @@ private fun Composer(
                             .size(44.dp)
                             .clip(CircleShape)
                             .background(fill)
-                            .clickable(enabled = canSend, onClick = onSend)
+                            .clickable(enabled = canSend, onClick = submit)
                             .testTag("chat.send"),
                         contentAlignment = Alignment.Center,
                     ) {
@@ -557,7 +569,7 @@ private fun FooterChip(icon: androidx.compose.ui.graphics.vector.ImageVector, te
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 private fun ModelPickerSheet(
     picker: ModelPickerState,
@@ -568,7 +580,7 @@ private fun ModelPickerSheet(
     val colors = HermexTheme.colors
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = colors.secondaryBackground) {
-        Column(Modifier.fillMaxWidth().testTag("chat.modelPicker")) {
+        Column(Modifier.fillMaxWidth().semantics { testTagsAsResourceId = true }.testTag("chat.modelPicker")) {
             Text("Model", color = colors.label, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
             when (picker) {
                 ModelPickerState.Loading -> Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {

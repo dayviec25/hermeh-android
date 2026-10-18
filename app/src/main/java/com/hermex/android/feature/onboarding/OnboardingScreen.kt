@@ -80,7 +80,10 @@ import androidx.compose.ui.platform.ClipEntry
 import android.content.ClipData
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -132,6 +135,7 @@ fun OnboardingRoute(
     )
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun OnboardingScreen(
     state: ConnectUiState,
@@ -246,7 +250,7 @@ fun OnboardingScreen(
             title = { Text("Copy the setup prompt first") },
             text = { Text("Copy the agent setup prompt on your desktop before continuing so Hermes sign-in and HTTPS are configured correctly.") },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(modifier = Modifier.semantics { testTagsAsResourceId = true }.testTag("onboarding.continueAnyway"), onClick = {
                     showReminder = false
                     bypassed = true
                     scope.launch { pager.animateScrollToPage(PROMPT_PAGE + 1) }
@@ -271,7 +275,11 @@ private fun WelcomePage() {
                     ),
                 )
                 drawCircle(
-                    Brush.radialGradient(0f to Onboarding.glowInner.copy(alpha = 0.35f), 1f to Color.Transparent),
+                    Brush.radialGradient(
+                        0f to Onboarding.glowInner.copy(alpha = 0.35f),
+                        1f to Color.Transparent,
+                        radius = size.minDimension * 0.35f,
+                    ),
                     radius = size.minDimension * 0.35f,
                 )
             }

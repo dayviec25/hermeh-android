@@ -25,7 +25,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -152,7 +151,7 @@ fun HomeScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(Icons.Filled.EditNote, contentDescription = null, tint = colors.label, modifier = Modifier.size(22.dp))
+            Icon(painterResource(R.drawable.ic_edit_square), contentDescription = null, tint = colors.label, modifier = Modifier.size(22.dp))
             Text("Chat", color = colors.label, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         }
     }

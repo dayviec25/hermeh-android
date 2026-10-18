@@ -21,7 +21,9 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -75,6 +77,15 @@ fun Modifier.glassSurface(shape: Shape, elevated: Boolean = false): Modifier {
 @Composable
 fun GlassCircleButton(
     icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp = 44.dp,
+) = GlassCircleButton(rememberVectorPainter(icon), contentDescription, onClick, modifier, size)
+
+@Composable
+fun GlassCircleButton(
+    icon: Painter,
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,

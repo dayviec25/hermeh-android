@@ -93,7 +93,7 @@ class ConnectViewModel(
         viewModelScope.launch {
             try {
                 auth.connect(current.url, current.username, current.password, validHeaders(current))
-                _state.update { it.copy(status = ConnectStatus.Idle) }
+                _state.update { it.copy(status = ConnectStatus.Idle, password = "") }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Throwable) {

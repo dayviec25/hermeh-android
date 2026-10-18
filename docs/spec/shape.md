@@ -97,3 +97,32 @@ Instead of astack-mock, the app is verified against the real pinned hermes-agent
 1. Foundation + core chat: scaffold, design system, onboarding + connect + sign-in, home (sidebar rows + Sessions list), chat (transcript load, send, stream, thinking/tool rows, approvals, stop, run status), model + reasoning picker, settings (server, appearance, sign out). All other destinations exist as routes with a "coming soon" placeholder.
 2. Panels in parallel, one package each: Tasks (cron), Skills, Memory, Insights; Profiles + Projects; Kanban; Workspace browser; Bots inbox; session actions (rename, pin, archive, delete, search, fork).
 3. Polish: offline cache, attachments, slash commands, markdown completeness, dark mode and large-font passes.
+
+## Phase 1 notes
+
+Android phase 1 (branch `phase1-core`), verified on the Pixel 4a emulator against the pinned 0.21.5 stub host.
+
+Shape additions, each the smallest the protocol needed:
+- `HermesUser(userId, displayName, provider)`: `AuthState.SignedIn` names it but the shape never defined it. Fields are the ones `GET /api/auth/me` returns.
+- `reduce(state, event, now: Instant)`: the reducer takes the clock as an argument so it stays pure while `RunState.Working.since` needs a time.
+- `ChatState` (feature layer) wraps the shape's types: `items`, `pending`, `run`, plus `turnSince`, `hostRunning`, `stopRequested`, `ending`, `title`, `model`, `provider`, `reasoning`, `storedKey`. The turn-end rule (end on `session.info running:false`, `message.complete` sets the ending) needs `hostRunning` and `ending`.
+- `ApprovalChoice` carries its wire string and label; `NoticeKind` is `Error | Interrupted`.
+- `reasoning.available` maps to `GatewayEvent.Unknown` on purpose: in this host it repeats the answer text.
+
+Protocol surprises from the live host:
+- `model.options` works without `session_id` (profile only), so a new chat can open the picker before `session.create`. A picked model is then passed to `session.create {model, provider}`.
+- The stub reuses `tool_id` `call_2` on every turn, so a live tool row and a history row can share an id. The reducer replaces the older row with the same id.
+- `tool.complete.duration_s` includes the time the approval waited.
+- Interrupting during an approval ends the tool with a `result.error`, then `message.complete {status:"interrupted"}` and `session.info running:false`.
+- REST transcript rows carry text in `content` (not `text` as in the session.resume fixture). Both are read.
+- `GET /api/profiles/active` returns `{active, current}`; the session list uses `active`.
+
+Platform deviations:
+- `compileSdk` is 37 because Compose BOM 2026.09, Navigation 2.10 and the Markdown renderer require it. `targetSdk` stays 36 and `minSdk` 28.
+- Brand palette instead of Material dynamic color: the design is the iOS palette, not wallpaper colors.
+- Session cookies are stored encrypted with the same Keystore AES-GCM key as the password, in DataStore.
+- Sign out asks for confirmation (`settings.signOut.confirm`), as iOS does.
+
+Stubbed in phase 1: Search and every sidebar destination (placeholder route), attachments (+), voice (mic), workspace folder button, slash commands, clarify/credential cards are minimal, tool rows do not group ("Show previous N"), transcript is not cached in Room (only the session list is), browser (PKCE) sign-in.
+
+Verification gaps: the < 0.21.3 refusal, silent re-sign-in on 401 and gateway reconnect were not driven on the device (the pinned host is 0.21.5 and must not be restarted). agent-device's accessibility tree lags several seconds after Compose navigation and while the run-status timer ticks; `wait` on a selector can time out even when `press` on the same selector succeeds.
