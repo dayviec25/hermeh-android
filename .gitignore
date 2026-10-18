@@ -8,3 +8,4 @@ local.properties
 .astack/runs/
 captures/
 .kotlin/
+keystore.properties

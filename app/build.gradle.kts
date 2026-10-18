@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -19,8 +21,23 @@ android {
         versionName = "0.1.0"
     }
 
+    val keystore = rootProject.file("keystore.properties").takeIf { it.exists() }?.let { file ->
+        Properties().apply { file.inputStream().use(::load) }
+    }
+    signingConfigs {
+        if (keystore != null) {
+            create("release") {
+                storeFile = file(keystore.getProperty("storeFile"))
+                storePassword = keystore.getProperty("storePassword")
+                keyAlias = keystore.getProperty("keyAlias")
+                keyPassword = keystore.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (keystore != null) signingConfig = signingConfigs.getByName("release")
             optimization {
                 enable = true
             }
