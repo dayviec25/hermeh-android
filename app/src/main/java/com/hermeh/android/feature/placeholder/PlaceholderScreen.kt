@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hermeh.android.core.designsystem.GlassCircleButton
 import com.hermeh.android.core.designsystem.HermehTheme
+import com.hermeh.android.core.designsystem.HermehType
 
 @Composable
 fun PlaceholderScreen(title: String, onBack: () -> Unit, modifier: Modifier = Modifier) {
@@ -30,7 +31,7 @@ fun PlaceholderScreen(title: String, onBack: () -> Unit, modifier: Modifier = Mo
     Column(modifier.fillMaxSize().background(colors.background).windowInsetsPadding(WindowInsets.statusBars)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             GlassCircleButton(Icons.AutoMirrored.Filled.ArrowBack, "Back", onBack, Modifier.testTag("placeholder.back"))
-            Text(title, color = colors.label, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 14.dp))
+            Text(title, style = HermehType.screenTitle, color = colors.label, modifier = Modifier.padding(start = 14.dp))
         }
         Column(
             Modifier.fillMaxSize().padding(32.dp),

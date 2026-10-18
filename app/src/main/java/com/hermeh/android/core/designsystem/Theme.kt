@@ -1,6 +1,7 @@
 package com.hermeh.android.core.designsystem
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -10,12 +11,14 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.hermeh.android.core.data.LogoColor
 import com.hermeh.android.core.data.ThemeMode
+import com.hermeh.android.core.model.MascotColor
 
 @Immutable
 data class HermehColors(
@@ -28,6 +31,8 @@ data class HermehColors(
     val tertiaryLabel: Color,
     val separator: Color,
     val accent: Color,
+    val ink: Color,
+    val onInk: Color,
     val userBubble: Color,
     val userBubbleStroke: Color,
     val codeBackground: Color,
@@ -43,54 +48,59 @@ data class HermehColors(
     val working: Color,
     val danger: Color,
     val success: Color,
-    val logo: Color,
-    val onLogo: Color,
+    val mascot: Color,
+    val onMascot: Color,
 )
 
 object Onboarding {
-    val background = Color(0xFF000000)
-    val amber = Color(0xFFFFBD1A)
+    val background = Color(0xFF161412)
+    val sunny = Color(0xFFFFC94D)
+    val onSunny = Color(0xFF1F1B16)
     val success = Color(0xFF73EB8F)
     val error = Color(0xFFFF7857)
-    val glow = Color(0xFFFF9E14)
-    val glowInner = Color(0xFFFFC72E)
+    val glow = Color(0xFFFFB547)
+    val glowInner = Color(0xFFFFD877)
 }
 
-private fun colors(dark: Boolean, logo: Color): HermehColors {
-    val label = if (dark) Color.White else Color.Black
+val OnMascot = Color(0xFF1F1B16)
+
+private fun colors(dark: Boolean, mascot: Color): HermehColors {
+    val label = if (dark) Color(0xFFF4EFE8) else Color(0xFF1F1B16)
+    val background = if (dark) Color(0xFF161412) else Color(0xFFFBF8F3)
+    val secondaryBackground = if (dark) Color(0xFF211E1B) else Color(0xFFF3EEE6)
     return HermehColors(
         isDark = dark,
-        background = if (dark) Color(0xFF000000) else Color(0xFFFFFFFF),
-        secondaryBackground = if (dark) Color(0xFF1C1C1E) else Color(0xFFF2F2F7),
-        tertiaryBackground = if (dark) Color(0xFF2C2C2E) else Color(0xFFFFFFFF),
+        background = background,
+        secondaryBackground = secondaryBackground,
+        tertiaryBackground = if (dark) Color(0xFF2B2724) else Color(0xFFFFFFFF),
         label = label,
-        secondaryLabel = label.copy(alpha = 0.6f),
-        tertiaryLabel = label.copy(alpha = 0.3f),
-        separator = if (dark) Color(0xFF38383A) else Color(0xFFC6C6C8),
-        accent = if (dark) Color(0xFF0A84FF) else Color(0xFF007AFF),
-        userBubble = if (dark) Color(0xFF48484A) else Color(0xFFF2F2F7),
-        userBubbleStroke = if (dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.04f),
-        codeBackground = if (dark) Color(0xFF0A0D12) else Color(0xFFF2F2F7),
-        inlineCode = if (dark) Color(0xFF14171F) else Color(0xFFEFEFF4),
-        tableBackground = if (dark) Color(0xFF18191D) else Color(0xFFFFFFFF),
-        tableAlternate = if (dark) Color(0xFF25262A) else Color(0xFFF7F7F9),
-        tableBorder = if (dark) Color(0xFF42444E) else Color(0xFFE4E4E8),
-        glass = (if (dark) Color(0xFF1C1C1E) else Color(0xFFF2F2F7)).copy(alpha = 0.85f),
-        glassStroke = if (dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f),
+        secondaryLabel = label.copy(alpha = 0.62f),
+        tertiaryLabel = label.copy(alpha = 0.34f),
+        separator = if (dark) Color(0xFF3A3531) else Color(0xFFE6DED2),
+        accent = if (dark) Color(0xFFE8946A) else Color(0xFFC8643B),
+        ink = label,
+        onInk = background,
+        userBubble = mascot.copy(alpha = if (dark) 0.18f else 0.22f).compositeOver(secondaryBackground),
+        userBubbleStroke = if (dark) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.04f),
+        codeBackground = if (dark) Color(0xFF0F0E0C) else Color(0xFFF1EBE1),
+        inlineCode = if (dark) Color(0xFF24201C) else Color(0xFFEEE7DC),
+        tableBackground = if (dark) Color(0xFF1C1A17) else Color(0xFFFFFFFF),
+        tableAlternate = if (dark) Color(0xFF262320) else Color(0xFFF8F4EE),
+        tableBorder = if (dark) Color(0xFF3A3531) else Color(0xFFE6DED2),
+        glass = secondaryBackground.copy(alpha = 0.88f),
+        glassStroke = if (dark) Color.White.copy(alpha = 0.07f) else Color.Black.copy(alpha = 0.06f),
         shadow = Color.Black.copy(alpha = if (dark) 0.28f else 0.12f),
         approval = if (dark) Color(0xFFFCD34D) else Color(0xFFB45309),
         input = if (dark) Color(0xFFA5B4FC) else Color(0xFF4F46E5),
         working = if (dark) Color(0xFF38BDF8) else Color(0xFF0284C7),
         danger = Color(0xFFFF3B30),
         success = Color(0xFF34C759),
-        logo = logo,
-        onLogo = if (logo.luminanceApprox() > 0.62f) Color.Black else Color.White,
+        mascot = mascot,
+        onMascot = OnMascot,
     )
 }
 
-private fun Color.luminanceApprox(): Float = 0.2126f * red + 0.7152f * green + 0.0722f * blue
-
-val LocalHermehColors = staticCompositionLocalOf { colors(dark = false, logo = Color(0xFFFFD700)) }
+val LocalHermehColors = staticCompositionLocalOf { colors(dark = false, mascot = Color(MascotColor.Sunny.argb)) }
 
 object HermehTheme {
     val colors: HermehColors
@@ -98,6 +108,27 @@ object HermehTheme {
 }
 
 val MonoFamily = FontFamily.Monospace
+
+val DisplayFamily = FontFamily.Serif
+
+object HermehType {
+    val thought = TextStyle(fontFamily = DisplayFamily, fontWeight = FontWeight.Medium, fontSize = 17.sp, lineHeight = 22.sp)
+    val screenTitle = TextStyle(fontFamily = DisplayFamily, fontWeight = FontWeight.Medium, fontSize = 26.sp, lineHeight = 32.sp)
+    val headline = TextStyle(fontFamily = DisplayFamily, fontWeight = FontWeight.Medium, fontSize = 28.sp, lineHeight = 34.sp)
+    val hero = TextStyle(fontFamily = DisplayFamily, fontWeight = FontWeight.Medium, fontSize = 32.sp, lineHeight = 38.sp)
+    val wordmark = TextStyle(fontFamily = DisplayFamily, fontWeight = FontWeight.Medium, fontSize = 22.sp)
+    val nameTag = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+}
+
+object HermehShapes {
+    val card = RoundedCornerShape(24.dp)
+    val composer = RoundedCornerShape(28.dp)
+    val sheet = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    val tile = RoundedCornerShape(20.dp)
+    val bubble = RoundedCornerShape(22.dp)
+    val userBubble = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp, bottomEnd = 6.dp, bottomStart = 22.dp)
+    val capsule = RoundedCornerShape(50)
+}
 
 private val HermehTypography = Typography(
     titleLarge = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.SemiBold),
@@ -111,13 +142,13 @@ private val HermehTypography = Typography(
 )
 
 @Composable
-fun HermehTheme(mode: ThemeMode, logo: LogoColor, content: @Composable () -> Unit) {
+fun HermehTheme(mode: ThemeMode, mascot: MascotColor, content: @Composable () -> Unit) {
     val dark = when (mode) {
         ThemeMode.System -> isSystemInDarkTheme()
         ThemeMode.Light -> false
         ThemeMode.Dark -> true
     }
-    val palette = colors(dark, Color(logo.argb))
+    val palette = colors(dark, Color(mascot.argb))
     val scheme = if (dark) {
         darkColorScheme(
             primary = palette.label,

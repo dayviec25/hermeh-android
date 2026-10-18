@@ -6,7 +6,13 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.hermeh.android.core.model.Companion
+import com.hermeh.android.core.model.DefaultCompanion
+import com.hermeh.android.core.model.MascotCatalog
+import com.hermeh.android.core.model.MascotColor
+import com.hermeh.android.core.model.MascotId
 import com.hermeh.android.core.model.ServerConfig
+import com.hermeh.android.core.model.companionName
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -17,17 +23,6 @@ import kotlinx.serialization.json.Json
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "hermeh")
 
 enum class ThemeMode { System, Light, Dark }
-
-enum class LogoColor(val label: String, val argb: Long) {
-    Yellow("Yellow", 0xFFFFD700),
-    Blue("Blue", 0xFF5B7CFF),
-    Purple("Purple", 0xFFAF52DE),
-    Red("Red", 0xFFFF3B30),
-    Green("Green", 0xFF34C759),
-    White("White", 0xFFFFFFFF),
-}
-
-data class AppearancePrefs(val theme: ThemeMode, val logo: LogoColor)
 
 @Serializable
 private data class StoredServer(
@@ -49,10 +44,16 @@ class AppStore(private val context: Context, private val cipher: SecretCipher) {
         .map { prefs -> prefs[KEY_SERVER]?.let(::decodeServer) }
         .distinctUntilChanged()
 
-    val appearance: Flow<AppearancePrefs> = context.dataStore.data.map { prefs ->
-        AppearancePrefs(
-            theme = prefs[KEY_THEME]?.let { name -> ThemeMode.entries.firstOrNull { it.name == name } } ?: ThemeMode.System,
-            logo = prefs[KEY_LOGO]?.let { name -> LogoColor.entries.firstOrNull { it.name == name } } ?: LogoColor.Yellow,
+    val theme: Flow<ThemeMode> = context.dataStore.data.map { prefs ->
+        prefs[KEY_THEME]?.let { name -> ThemeMode.entries.firstOrNull { it.name == name } } ?: ThemeMode.System
+    }.distinctUntilChanged()
+
+    val companion: Flow<Companion> = context.dataStore.data.map { prefs ->
+        Companion(
+            name = prefs[KEY_COMPANION_NAME]?.let(::companionName) ?: DefaultCompanion.name,
+            mascot = prefs[KEY_COMPANION_MASCOT]?.let { MascotCatalog.find(MascotId(it)).id } ?: DefaultCompanion.mascot,
+            color = prefs[KEY_COMPANION_COLOR]?.let { name -> MascotColor.entries.firstOrNull { it.name == name } } ?: DefaultCompanion.color,
+            named = prefs[KEY_COMPANION_NAMED] == "1",
         )
     }.distinctUntilChanged()
 
@@ -114,8 +115,20 @@ class AppStore(private val context: Context, private val cipher: SecretCipher) {
         context.dataStore.edit { it[KEY_THEME] = mode.name }
     }
 
-    suspend fun setLogo(color: LogoColor) {
-        context.dataStore.edit { it[KEY_LOGO] = color.name }
+    suspend fun setCompanionName(raw: String) {
+        val name = companionName(raw) ?: return
+        context.dataStore.edit {
+            it[KEY_COMPANION_NAME] = name
+            it[KEY_COMPANION_NAMED] = "1"
+        }
+    }
+
+    suspend fun setCompanionColor(color: MascotColor) {
+        context.dataStore.edit { it[KEY_COMPANION_COLOR] = color.name }
+    }
+
+    suspend fun setCompanionMascot(id: MascotId) {
+        context.dataStore.edit { it[KEY_COMPANION_MASCOT] = MascotCatalog.find(id).id.value }
     }
 
     private fun decodeServer(raw: String): SavedServer? = runCatching {
@@ -134,12 +147,15 @@ class AppStore(private val context: Context, private val cipher: SecretCipher) {
         )
     }.getOrNull()
 
-    private companion object {
+    private companion object Keys {
         val KEY_SERVER = stringPreferencesKey("server")
         val KEY_PASSWORD = stringPreferencesKey("password.sealed")
         val KEY_COOKIES = stringPreferencesKey("cookies.sealed")
         val KEY_THEME = stringPreferencesKey("theme")
-        val KEY_LOGO = stringPreferencesKey("logo")
+        val KEY_COMPANION_NAME = stringPreferencesKey("companion.name")
+        val KEY_COMPANION_MASCOT = stringPreferencesKey("companion.mascot")
+        val KEY_COMPANION_COLOR = stringPreferencesKey("companion.color")
+        val KEY_COMPANION_NAMED = stringPreferencesKey("companion.named")
         val KEY_ONBOARDED = stringPreferencesKey("onboarded")
         val KEY_PROFILE_PICK = stringPreferencesKey("profile.pick")
         val KEY_SHOW_ALL = stringPreferencesKey("profile.showAll")

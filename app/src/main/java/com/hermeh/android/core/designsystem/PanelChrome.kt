@@ -39,10 +39,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hermeh.android.core.designsystem.GlassCircleButton
 import com.hermeh.android.core.designsystem.HermehTheme
+import com.hermeh.android.core.designsystem.HermehType
 import com.hermeh.android.core.designsystem.glassSurface
 
 private val CapsuleShape = RoundedCornerShape(50)
-val CardShape = RoundedCornerShape(18.dp)
+val CardShape = RoundedCornerShape(24.dp)
 
 @Composable
 fun PanelScaffold(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
@@ -64,21 +65,22 @@ fun PanelTopBar(
     actions: (@Composable RowScope.() -> Unit)? = null,
 ) {
     val colors = HermehTheme.colors
-    Box(modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).heightIn(min = 48.dp)) {
-        GlassCircleButton(Icons.AutoMirrored.Filled.ArrowBack, "Back", onBack, Modifier.align(Alignment.CenterStart).testTag(backTag))
+    Row(
+        modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).heightIn(min = 48.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        GlassCircleButton(Icons.AutoMirrored.Filled.ArrowBack, "Back", onBack, Modifier.testTag(backTag))
         Text(
             title,
+            style = HermehType.screenTitle,
             color = colors.label,
-            fontSize = 17.sp,
-            fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.align(Alignment.Center).padding(horizontal = 112.dp),
+            modifier = Modifier.weight(1f).padding(horizontal = 14.dp),
         )
         if (actions != null) {
             Row(
-                Modifier.align(Alignment.CenterEnd).heightIn(min = 44.dp).glassSurface(CapsuleShape).padding(horizontal = 4.dp),
+                Modifier.heightIn(min = 44.dp).glassSurface(CapsuleShape).padding(horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 content = actions,
             )
@@ -185,7 +187,7 @@ fun Segmented(
         modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(if (colors.isDark) colors.secondaryBackground else Color(0xFFEEEEF0))
+            .background(colors.secondaryBackground)
             .padding(2.dp),
     ) {
         options.forEach { (key, label) ->
@@ -194,7 +196,7 @@ fun Segmented(
                 Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(if (!active) Color.Transparent else if (colors.isDark) Color(0xFF636366) else colors.tertiaryBackground)
+                    .background(if (active) colors.tertiaryBackground else Color.Transparent)
                     .clickable { onSelect(key) }
                     .heightIn(min = 36.dp)
                     .testTag("$tagPrefix.$key"),

@@ -2,6 +2,7 @@ package com.hermeh.android.feature.home
 
 import androidx.annotation.DrawableRes
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
@@ -34,8 +36,10 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.ContentCopy
@@ -68,8 +72,10 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -82,6 +88,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -91,7 +98,15 @@ import com.hermeh.android.core.model.ConnectionState
 import com.hermeh.android.core.designsystem.HermehColors
 import com.hermeh.android.core.designsystem.AutomationAccessibilityRefresh
 import com.hermeh.android.core.designsystem.HermehTheme
-import com.hermeh.android.core.designsystem.HermehWordmark
+import com.hermeh.android.core.designsystem.CompanionSheet
+import com.hermeh.android.core.designsystem.HermehShapes
+import com.hermeh.android.core.designsystem.HermehType
+import com.hermeh.android.core.designsystem.Mascot
+import com.hermeh.android.core.model.Companion
+import com.hermeh.android.core.model.MascotCatalog
+import com.hermeh.android.core.model.MascotColor
+import com.hermeh.android.core.model.MascotId
+import com.hermeh.android.core.model.MascotMood
 import com.hermeh.android.core.designsystem.glassSurface
 import kotlinx.coroutines.delay
 
@@ -132,6 +147,9 @@ data class HomeActions(
     val onDelete: (SessionRowUi) -> Unit,
     val onUndoArchive: (String) -> Unit,
     val onDismissToast: (Long) -> Unit,
+    val onRenameCompanion: (String) -> Unit,
+    val onCompanionColor: (MascotColor) -> Unit,
+    val onCompanionMascot: (MascotId) -> Unit,
 )
 
 @Composable
@@ -178,6 +196,9 @@ fun HomeRoute(
             onDelete = viewModel::delete,
             onUndoArchive = viewModel::undoArchive,
             onDismissToast = viewModel::dismissToast,
+            onRenameCompanion = viewModel::renameCompanion,
+            onCompanionColor = viewModel::setCompanionColor,
+            onCompanionMascot = viewModel::setCompanionMascot,
         )
     }
     HomeScreen(state = state, initials = initials, actions = actions)
@@ -194,6 +215,7 @@ fun HomeScreen(
     val colors = HermehTheme.colors
     var renaming by remember { mutableStateOf<SessionRowUi?>(null) }
     var deleting by remember { mutableStateOf<SessionRowUi?>(null) }
+    var companionSheet by rememberSaveable { mutableStateOf<Boolean?>(null) }
     val rowActions = SessionRowActions(
         onOpen = actions.onOpenSession,
         onRename = { renaming = it },
@@ -210,6 +232,19 @@ fun HomeScreen(
         actions.onCloseSearch()
     }
     BackHandler(enabled = search != null, onBack = closeSearch)
+    val hero = HeroActions(
+        onMascot = { companionSheet = false },
+        onNameTag = { companionSheet = true },
+        onThought = { thought ->
+            when (thought) {
+                is CompanionThought.Working -> actions.onOpenSession(thought.session)
+                is CompanionThought.Replies -> actions.onOpenSession(thought.first)
+                is CompanionThought.Greeting -> actions.onNewChat()
+                CompanionThought.Intro -> companionSheet = true
+                is CompanionThought.Offline, CompanionThought.Loading -> Unit
+            }
+        },
+    )
     Box(modifier.fillMaxSize().background(colors.background)) {
         PullToRefreshBox(
             isRefreshing = state.refreshing,
@@ -223,33 +258,27 @@ fun HomeScreen(
                 item(key = "header", contentType = "header") {
                     Header(initials = initials, search = search, actions = actions, onCloseSearch = closeSearch)
                 }
-                if (state.connection != ConnectionState.Online) {
-                    item(key = "connection", contentType = "connection") { ConnectionBanner(state.connection) }
-                }
                 if (search != null && search.query.isNotBlank()) {
                     searchResults(search, rowActions)
                 } else {
+                    if (search == null) {
+                        item(key = "hero", contentType = "hero") { CompanionHero(state.companion, state.thought, hero) }
+                    }
                     sidebar(state, actions)
                     sessionList(state, actions, rowActions)
                 }
             }
         }
         if (search == null) {
-            Row(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(Brush.verticalGradient(listOf(colors.background.copy(alpha = 0f), colors.background)))
                     .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(end = 20.dp, bottom = 16.dp)
-                    .glassSurface(CircleShape, elevated = true)
-                    .clickable(onClick = actions.onNewChat)
-                    .padding(horizontal = 22.dp, vertical = 15.dp)
-                    .testTag("home.chat"),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Icon(painterResource(R.drawable.ic_edit_square), contentDescription = null, tint = colors.label, modifier = Modifier.size(22.dp))
-                Text("Chat", color = colors.label, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            }
+                    .height(92.dp),
+            )
+            ComposerPill(state.companion, actions.onNewChat, Modifier.align(Alignment.BottomCenter))
         }
         state.toast?.let { toast ->
             Toast(toast, actions, Modifier.align(Alignment.BottomCenter))
@@ -284,6 +313,20 @@ fun HomeScreen(
     (state.projectSheet as? ProjectSheet.Editing)?.let { sheet ->
         ProjectCreationSheet(sheet, actions.onDismissProjectSheet, actions.onCreateProject)
     }
+    companionSheet?.let { renaming ->
+        CompanionSheet(
+            companion = state.companion,
+            mood = state.thought.mood,
+            focusName = renaming,
+            onSaveName = { name ->
+                actions.onRenameCompanion(name)
+                if (renaming) companionSheet = null
+            },
+            onColor = actions.onCompanionColor,
+            onMascot = actions.onCompanionMascot,
+            onDismiss = { companionSheet = null },
+        )
+    }
 }
 
 private data class SessionRowActions(
@@ -297,18 +340,8 @@ private data class SessionRowActions(
 )
 
 private fun LazyListScope.sidebar(state: HomeUiState, actions: HomeActions) {
-    items(HomeDestination.entries, key = { "nav-${it.slug}" }, contentType = { "nav" }) { destination ->
-        NavRow(destination.title, destination.icon, testTag = "home.row.${destination.slug}", onClick = { actions.onDestination(destination) })
-    }
-    item(key = "nav-activeProfile", contentType = "nav") {
-        NavRow(
-            title = "Active Profile",
-            icon = R.drawable.ic_lucide_user_round_cog,
-            testTag = "home.row.activeProfile",
-            expanded = state.profilesExpanded,
-            onClick = actions.onToggleProfiles,
-        )
-    }
+    item(key = "destinations", contentType = "destinations") { DestinationGrid(actions.onDestination) }
+    item(key = "filters", contentType = "filters") { FilterChips(state, actions) }
     if (state.profilesExpanded) {
         when (val profiles = state.profiles) {
             ProfilesUi.Loading -> item(key = "profiles-loading", contentType = "subStatus") { SubStatus("Loading profiles...") }
@@ -337,27 +370,6 @@ private fun LazyListScope.sidebar(state: HomeUiState, actions: HomeActions) {
                 }
             }
         }
-    }
-    item(key = "nav-projects", contentType = "nav") {
-        NavRow(
-            title = "Projects",
-            icon = R.drawable.ic_lucide_folder,
-            testTag = "home.row.projects",
-            expanded = state.projectsExpanded,
-            onClick = actions.onToggleProjects,
-            trailing = if (state.projectsExpanded) {
-                {
-                    Box(
-                        Modifier.size(40.dp).clip(CircleShape).clickable(onClick = actions.onAddProject).testTag("project.add"),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(Icons.Filled.Add, contentDescription = "Add project", tint = HermehTheme.colors.secondaryLabel)
-                    }
-                }
-            } else {
-                null
-            },
-        )
     }
     if (state.projectsExpanded) {
         when (val projects = state.projects) {
@@ -413,7 +425,7 @@ private fun LazyListScope.sessionList(state: HomeUiState, actions: HomeActions, 
                 item(key = "pinned-title", contentType = "title") {
                     Text(
                         "Pinned",
-                        style = MaterialTheme.typography.titleLarge,
+                        style = HermehType.screenTitle,
                         color = HermehTheme.colors.label,
                         modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 28.dp, bottom = 8.dp).testTag("home.pinned"),
                     )
@@ -463,7 +475,7 @@ private fun LazyListScope.searchResults(search: SearchUi.Open, rowActions: Sessi
     item(key = "results-title", contentType = "title") {
         Text(
             "Results",
-            style = MaterialTheme.typography.titleLarge,
+            style = HermehType.screenTitle,
             color = HermehTheme.colors.label,
             modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 8.dp),
         )
@@ -485,7 +497,7 @@ private fun SectionTitle(title: String, state: HomeUiState, actions: HomeActions
         Modifier.fillMaxWidth().padding(start = 24.dp, end = 16.dp, top = 28.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, style = MaterialTheme.typography.titleLarge, color = colors.label, modifier = Modifier.weight(1f))
+        Text(title, style = HermehType.screenTitle, color = colors.label, modifier = Modifier.weight(1f))
         state.selectedProject?.let { project ->
             Row(
                 Modifier
@@ -507,52 +519,36 @@ private fun SectionTitle(title: String, state: HomeUiState, actions: HomeActions
 }
 
 @Composable
-private fun ConnectionBanner(connection: ConnectionState, modifier: Modifier = Modifier) {
-    val colors = HermehTheme.colors
-    val (text, tint) = when (connection) {
-        ConnectionState.Online -> return
-        ConnectionState.Reconnecting -> "Reconnecting to Hermes" to colors.secondaryLabel
-        ConnectionState.WaitingForNetwork -> "Offline. Waiting for network" to colors.secondaryLabel
-        is ConnectionState.Failed -> "Not connected to Hermes" to colors.danger
-    }
-    Box(modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 12.dp), contentAlignment = Alignment.Center) {
-        Row(
-            Modifier
-                .glassSurface(CircleShape)
-                .padding(horizontal = 12.dp, vertical = 7.dp)
-                .testTag("home.connection")
-                .clearAndSetSemantics { contentDescription = text },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Box(Modifier.size(7.dp).clip(CircleShape).background(tint))
-            Text(text, color = colors.label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-    }
-}
-
-@Composable
 private fun Header(initials: String, search: SearchUi.Open?, actions: HomeActions, onCloseSearch: () -> Unit) {
     val colors = HermehTheme.colors
     Row(
-        Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 28.dp, bottom = 16.dp).heightIn(min = 52.dp),
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp).heightIn(min = 52.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (search == null) {
-            HermehWordmark(color = colors.logo, modifier = Modifier.width(160.dp))
-            Spacer(Modifier.weight(1f))
-        }
-        Row(
-            Modifier.then(if (search != null) Modifier.weight(1f) else Modifier).glassSurface(CircleShape).padding(4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
             Box(
-                Modifier.size(44.dp).clip(CircleShape).clickable(onClick = actions.onOpenSearch).testTag("home.search"),
+                Modifier.size(44.dp).glassSurface(CircleShape).clickable(onClickLabel = "Search sessions", onClick = actions.onOpenSearch).testTag("home.search"),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Filled.Search, contentDescription = "Search", tint = colors.label, modifier = Modifier.size(24.dp))
+                Icon(Icons.Filled.Search, contentDescription = "Search", tint = colors.label, modifier = Modifier.size(22.dp))
             }
-            if (search != null) {
+            Spacer(Modifier.weight(1f))
+            Box(
+                Modifier.size(44.dp).glassSurface(CircleShape).clickable(onClickLabel = "Settings", onClick = actions.onSettings).testTag("home.avatar"),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(Modifier.size(36.dp).clip(CircleShape).background(colors.mascot), contentAlignment = Alignment.Center) {
+                    Text(initials, color = colors.onMascot, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        } else {
+            Row(
+                Modifier.weight(1f).glassSurface(CircleShape).padding(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.size(44.dp).testTag("home.search"), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Filled.Search, contentDescription = null, tint = colors.label, modifier = Modifier.size(22.dp))
+                }
                 val focus = remember { FocusRequester() }
                 LaunchedEffect(Unit) { focus.requestFocus() }
                 BasicTextField(
@@ -560,7 +556,7 @@ private fun Header(initials: String, search: SearchUi.Open?, actions: HomeAction
                     onValueChange = actions.onQuery,
                     singleLine = true,
                     textStyle = TextStyle(color = colors.label, fontSize = 16.sp),
-                    cursorBrush = SolidColor(colors.label),
+                    cursorBrush = SolidColor(colors.accent),
                     modifier = Modifier.weight(1f).focusRequester(focus).testTag("search.field"),
                     decorationBox = { inner ->
                         Box {
@@ -575,13 +571,125 @@ private fun Header(initials: String, search: SearchUi.Open?, actions: HomeAction
                 ) {
                     Icon(Icons.Filled.Close, contentDescription = "Close search", tint = colors.secondaryLabel, modifier = Modifier.size(20.dp))
                 }
-            } else {
-                Box(
-                    Modifier.size(44.dp).clip(CircleShape).clickable(onClick = actions.onSettings).testTag("home.avatar"),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Box(Modifier.size(38.dp).clip(CircleShape).background(colors.logo), contentAlignment = Alignment.Center) {
-                        Text(initials, color = colors.onLogo, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+private data class HeroActions(
+    val onMascot: () -> Unit,
+    val onNameTag: () -> Unit,
+    val onThought: (CompanionThought) -> Unit,
+)
+
+@Composable
+private fun CompanionHero(companion: Companion, thought: CompanionThought, actions: HeroActions) {
+    val colors = HermehTheme.colors
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(top = 4.dp, bottom = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Crossfade(targetState = thought, label = "thought") { current ->
+            ThoughtBubble(current, companion.name, onClick = { actions.onThought(current) })
+        }
+        Box(Modifier.width(120.dp).height(20.dp)) {
+            Box(Modifier.padding(start = 22.dp, top = 4.dp).size(10.dp).shadow(2.dp, CircleShape, ambientColor = colors.shadow, spotColor = colors.shadow).background(colors.tertiaryBackground, CircleShape).border(1.dp, colors.glassStroke, CircleShape))
+            Box(Modifier.padding(start = 36.dp, top = 15.dp).size(6.dp).background(colors.tertiaryBackground, CircleShape).border(1.dp, colors.glassStroke, CircleShape))
+        }
+        Mascot(
+            mascot = MascotCatalog.find(companion.mascot),
+            color = colors.mascot,
+            mood = thought.mood,
+            size = 112.dp,
+            name = companion.name,
+            modifier = Modifier
+                .clip(CircleShape)
+                .clickable(onClickLabel = "Open companion", onClick = actions.onMascot)
+                .testTag("home.mascot"),
+        )
+        Row(
+            Modifier
+                .padding(top = 6.dp)
+                .clip(HermehShapes.capsule)
+                .background(colors.secondaryBackground)
+                .clickable(onClickLabel = "Rename", onClick = actions.onNameTag)
+                .heightIn(min = 36.dp)
+                .padding(start = 14.dp, end = 12.dp)
+                .testTag("home.nameTag"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(companion.name, style = HermehType.nameTag, color = colors.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Icon(Icons.Outlined.Edit, contentDescription = null, tint = colors.secondaryLabel, modifier = Modifier.size(14.dp))
+        }
+    }
+}
+
+@Composable
+private fun ThoughtBubble(thought: CompanionThought, name: String, onClick: () -> Unit) {
+    val colors = HermehTheme.colors
+    val (text, detail) = thought.copy(name)
+    val tappable = when (thought) {
+        is CompanionThought.Working, is CompanionThought.Replies, is CompanionThought.Greeting, CompanionThought.Intro -> true
+        is CompanionThought.Offline, CompanionThought.Loading -> false
+    }
+    Column(
+        Modifier
+            .widthIn(max = 300.dp)
+            .shadow(10.dp, HermehShapes.bubble, ambientColor = colors.shadow, spotColor = colors.shadow)
+            .clip(HermehShapes.bubble)
+            .background(colors.tertiaryBackground)
+            .border(1.dp, colors.glassStroke, HermehShapes.bubble)
+            .clickable(enabled = tappable, onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 12.dp)
+            .testTag("home.thought"),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(text, style = HermehType.thought, color = colors.label, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+        if (detail != null) {
+            Text(detail, color = colors.secondaryLabel, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 2.dp))
+        }
+    }
+}
+
+private fun CompanionThought.copy(name: String): Pair<String, String?> = when (this) {
+    is CompanionThought.Offline -> when (connection) {
+        is ConnectionState.Failed -> "I can't reach your server"
+        ConnectionState.Reconnecting, ConnectionState.Online -> "Reconnecting…"
+        ConnectionState.WaitingForNetwork -> "Waiting for network…"
+    } to null
+    CompanionThought.Loading -> "Catching up on your sessions…" to null
+    is CompanionThought.Working -> "Working on “${session.title}”${if (others > 0) " and $others more" else ""}" to null
+    is CompanionThought.Replies -> "$count new ${if (count == 1) "reply" else "replies"} waiting" to first.title
+    CompanionThought.Intro -> "Hi, I'm $name! Tap my name tag to rename me." to null
+    is CompanionThought.Greeting -> when (partOfDay) {
+        PartOfDay.Morning -> "Good morning. What should we work on?"
+        PartOfDay.Afternoon -> "Good afternoon. What should we work on?"
+        PartOfDay.Evening -> "Good evening. What should we work on?"
+    } to null
+}
+
+@Composable
+private fun DestinationGrid(onDestination: (HomeDestination) -> Unit) {
+    val colors = HermehTheme.colors
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        HomeDestination.entries.chunked(3).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                row.forEach { destination ->
+                    Column(
+                        Modifier
+                            .weight(1f)
+                            .heightIn(min = 76.dp)
+                            .clip(HermehShapes.tile)
+                            .background(colors.secondaryBackground)
+                            .clickable { onDestination(destination) }
+                            .padding(horizontal = 8.dp, vertical = 12.dp)
+                            .testTag("home.row.${destination.slug}"),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
+                    ) {
+                        Icon(painterResource(destination.icon), contentDescription = null, tint = colors.label, modifier = Modifier.size(22.dp))
+                        Text(destination.title, color = colors.label, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -590,40 +698,92 @@ private fun Header(initials: String, search: SearchUi.Open?, actions: HomeAction
 }
 
 @Composable
-private fun NavRow(
-    title: String,
-    @DrawableRes icon: Int,
-    testTag: String,
-    onClick: () -> Unit,
-    expanded: Boolean? = null,
-    trailing: (@Composable () -> Unit)? = null,
-) {
-    val colors = HermehTheme.colors
+private fun FilterChips(state: HomeUiState, actions: HomeActions) {
+    val profile = when {
+        state.showAll -> "All"
+        else -> (state.profiles as? ProfilesUi.Ready)?.options?.firstOrNull { it.selected }?.displayName ?: state.profile
+    }
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(
-            Modifier
-                .weight(1f)
-                .clip(RoundedCornerShape(10.dp))
-                .clickable(onClick = onClick)
-                .heightIn(min = 48.dp)
-                .padding(horizontal = 12.dp, vertical = 6.dp)
-                .testTag(testTag),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) {
-                Icon(painterResource(icon), contentDescription = null, tint = colors.label, modifier = Modifier.size(21.dp))
-            }
-            Spacer(Modifier.width(18.dp))
-            Text(title, color = colors.label, fontSize = 17.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-            if (expanded != null) {
-                val angle by animateFloatAsState(if (expanded) 90f else 0f, label = "chevron")
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = colors.secondaryLabel, modifier = Modifier.rotate(angle))
+        FilterChip("Profile", profile, state.profilesExpanded, "home.row.activeProfile", actions.onToggleProfiles, Modifier.weight(1f, fill = false))
+        FilterChip("Project", state.selectedProject?.label ?: "All", state.projectsExpanded, "home.row.projects", actions.onToggleProjects, Modifier.weight(1f, fill = false))
+        if (state.projectsExpanded) {
+            Box(
+                Modifier.size(40.dp).clip(CircleShape).background(HermehTheme.colors.secondaryBackground).clickable(onClick = actions.onAddProject).testTag("project.add"),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = "Add project", tint = HermehTheme.colors.secondaryLabel, modifier = Modifier.size(20.dp))
             }
         }
-        trailing?.invoke()
+    }
+}
+
+@Composable
+private fun FilterChip(title: String, value: String, expanded: Boolean, tag: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = HermehTheme.colors
+    val angle by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
+    Row(
+        modifier
+            .clip(HermehShapes.capsule)
+            .background(if (expanded) colors.accent.copy(alpha = 0.12f) else colors.secondaryBackground)
+            .clickable(onClick = onClick)
+            .heightIn(min = 40.dp)
+            .padding(start = 14.dp, end = 10.dp)
+            .testTag(tag),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "$title · $value",
+            color = if (expanded) colors.accent else colors.label,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        Icon(
+            Icons.Filled.KeyboardArrowDown,
+            contentDescription = null,
+            tint = if (expanded) colors.accent else colors.secondaryLabel,
+            modifier = Modifier.padding(start = 2.dp).size(18.dp).rotate(angle),
+        )
+    }
+}
+
+@Composable
+private fun ComposerPill(companion: Companion, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = HermehTheme.colors
+    Row(
+        modifier
+            .fillMaxWidth()
+            .windowInsetsPadding(WindowInsets.navigationBars)
+            .padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
+            .shadow(14.dp, HermehShapes.composer, ambientColor = colors.shadow, spotColor = colors.shadow)
+            .clip(HermehShapes.composer)
+            .background(colors.secondaryBackground)
+            .border(1.dp, colors.glassStroke, HermehShapes.composer)
+            .clickable(onClickLabel = "New chat", onClick = onClick)
+            .heightIn(min = 56.dp)
+            .padding(start = 12.dp, end = 8.dp)
+            .testTag("home.chat"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Mascot(
+            MascotCatalog.find(companion.mascot),
+            colors.mascot,
+            MascotMood.Idle,
+            28.dp,
+            Modifier.clearAndSetSemantics { },
+            animated = false,
+        )
+        Text("Message ${companion.name}…", color = colors.secondaryLabel, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        Box(Modifier.size(40.dp).clip(CircleShape).background(colors.ink), contentAlignment = Alignment.Center) {
+            Icon(Icons.Filled.ArrowUpward, contentDescription = null, tint = colors.onInk, modifier = Modifier.size(20.dp))
+        }
     }
 }
 
@@ -696,6 +856,9 @@ private fun SessionRow(row: SessionRowUi, actions: SessionRowActions, testTag: S
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Row(verticalAlignment = Alignment.Top) {
+                if (row.active) {
+                    Box(Modifier.padding(top = 7.dp, end = 8.dp).size(7.dp).clip(CircleShape).background(colors.working).testTag("session.active.${row.key}"))
+                }
                 if (row.unread) {
                     Box(Modifier.padding(top = 6.dp, end = 6.dp).size(10.dp).clip(CircleShape).background(colors.accent).testTag("session.unread.${row.key}"))
                 }
@@ -766,7 +929,7 @@ private fun RenameSheet(row: SessionRowUi, onDismiss: () -> Unit, onSave: (Strin
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onDismiss) { Text("Cancel", color = colors.label) }
-                Text("Rename Session", color = colors.label, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                Text("Rename Session", color = colors.label, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                 TextButton(onClick = { onSave(text) }, enabled = text.isNotBlank(), modifier = Modifier.testTag("rename.save")) {
                     Text("Save", color = if (text.isNotBlank()) colors.accent else colors.tertiaryLabel, fontWeight = FontWeight.SemiBold)
                 }
@@ -793,7 +956,7 @@ private fun ProjectCreationSheet(sheet: ProjectSheet.Editing, onDismiss: () -> U
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onDismiss) { Text("Cancel", color = colors.label) }
-                Text("New Project", color = colors.label, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                Text("New Project", color = colors.label, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                 TextButton(onClick = { onCreate(name, folder) }, enabled = !sheet.saving, modifier = Modifier.testTag("project.create.save")) {
                     Text("Create", color = colors.accent, fontWeight = FontWeight.SemiBold)
                 }

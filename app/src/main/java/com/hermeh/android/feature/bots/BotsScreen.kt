@@ -53,6 +53,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hermeh.android.core.designsystem.GlassCircleButton
 import com.hermeh.android.core.designsystem.HermehTheme
+import com.hermeh.android.core.designsystem.HermehType
 import com.hermeh.android.core.designsystem.glassSurface
 import com.hermeh.android.core.model.BotLiveStatus
 
@@ -102,7 +103,7 @@ fun BotsScreen(
     Column(modifier.fillMaxSize().background(colors.background).windowInsetsPadding(WindowInsets.statusBars)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             GlassCircleButton(Icons.AutoMirrored.Filled.ArrowBack, "Back", onBack, Modifier.testTag("bots.back"))
-            Text("Bots", color = colors.label, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 14.dp))
+            Text("Bots", style = HermehType.screenTitle, color = colors.label, modifier = Modifier.padding(start = 14.dp))
         }
         val success = state as? BotsUiState.Success
         SearchBar(success?.query.orEmpty(), onQueryChange, enabled = success != null)

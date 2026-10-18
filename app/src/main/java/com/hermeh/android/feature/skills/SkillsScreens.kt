@@ -231,7 +231,7 @@ private fun SkillRow(skill: Skill, toggling: Boolean, onOpen: () -> Unit, onTogg
 private fun HammerBadge() {
     val colors = HermehTheme.colors
     Box(
-        Modifier.size(36.dp).clip(CircleShape).background(if (colors.isDark) colors.secondaryBackground else Color(0xFFEEEEF0)),
+        Modifier.size(36.dp).clip(CircleShape).background(colors.secondaryBackground),
         contentAlignment = Alignment.Center,
     ) {
         Icon(painterResource(R.drawable.ic_lucide_hammer), contentDescription = null, tint = colors.label, modifier = Modifier.size(19.dp))

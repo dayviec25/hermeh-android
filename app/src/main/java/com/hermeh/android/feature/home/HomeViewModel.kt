@@ -2,7 +2,13 @@ package com.hermeh.android.feature.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hermeh.android.core.data.AppStore
 import com.hermeh.android.core.data.SessionRepository
+import com.hermeh.android.core.model.Companion
+import com.hermeh.android.core.model.DefaultCompanion
+import com.hermeh.android.core.model.MascotColor
+import com.hermeh.android.core.model.MascotId
+import com.hermeh.android.core.model.MascotMood
 import com.hermeh.android.core.model.DeleteOutcome
 import com.hermeh.android.core.model.ProfileSummary
 import com.hermeh.android.core.model.ProjectLane
@@ -14,6 +20,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -23,11 +30,13 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalTime
 
 data class SessionRowUi(
     val key: String,
@@ -38,7 +47,61 @@ data class SessionRowUi(
     val unread: Boolean,
     val pinned: Boolean,
     val cwd: String?,
+    val active: Boolean,
 )
+
+enum class PartOfDay { Morning, Afternoon, Evening }
+
+sealed interface CompanionThought {
+    val mood: MascotMood
+
+    data class Offline(val connection: ConnectionState) : CompanionThought {
+        override val mood: MascotMood get() = MascotMood.Offline
+    }
+
+    data object Loading : CompanionThought {
+        override val mood: MascotMood get() = MascotMood.Idle
+    }
+
+    data class Working(val session: SessionRowUi, val others: Int) : CompanionThought {
+        override val mood: MascotMood get() = MascotMood.Working
+    }
+
+    data class Replies(val first: SessionRowUi, val count: Int) : CompanionThought {
+        override val mood: MascotMood get() = MascotMood.Happy
+    }
+
+    data object Intro : CompanionThought {
+        override val mood: MascotMood get() = MascotMood.Happy
+    }
+
+    data class Greeting(val partOfDay: PartOfDay) : CompanionThought {
+        override val mood: MascotMood get() = MascotMood.Idle
+    }
+}
+
+fun companionThought(
+    connection: ConnectionState,
+    loaded: Boolean,
+    rows: List<SessionRowUi>,
+    companion: Companion,
+    partOfDay: PartOfDay,
+): CompanionThought {
+    if (connection != ConnectionState.Online) return CompanionThought.Offline(connection)
+    if (!loaded && rows.isEmpty()) return CompanionThought.Loading
+    val active = rows.filter { it.active }
+    if (active.isNotEmpty()) return CompanionThought.Working(active.first(), active.size - 1)
+    val unread = rows.filter { it.unread }
+    if (unread.isNotEmpty()) return CompanionThought.Replies(unread.first(), unread.size)
+    if (!companion.named) return CompanionThought.Intro
+    return CompanionThought.Greeting(partOfDay)
+}
+
+fun partOfDay(time: LocalTime): PartOfDay = when (time.hour) {
+    in 5..11 -> PartOfDay.Morning
+    in 12..16 -> PartOfDay.Afternoon
+    else -> PartOfDay.Evening
+}
 
 sealed interface SessionsContent {
     data object Loading : SessionsContent
@@ -91,7 +154,9 @@ data class HomeUiState(
     val search: SearchUi,
     val toast: HomeToast?,
     val projectSheet: ProjectSheet,
-    val connection: ConnectionState = ConnectionState.Online,
+    val connection: ConnectionState,
+    val companion: Companion,
+    val thought: CompanionThought,
 )
 
 private data class LoadStatus(
@@ -115,6 +180,8 @@ private data class Panels(
     val projectSheet: ProjectSheet = ProjectSheet.Hidden,
 )
 
+private data class Listing(val loaded: Boolean, val rows: List<SessionRowUi>)
+
 private data class SearchState(val open: Boolean = false, val query: String = "", val searching: Boolean = false, val server: List<SessionSummary> = emptyList())
 
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
@@ -126,6 +193,8 @@ class HomeViewModel(
     private val pickProfile: suspend (String, Boolean) -> Unit,
     sessionsChanged: Flow<Unit>,
     connection: Flow<ConnectionState>,
+    companion: Flow<Companion>,
+    private val companionStore: AppStore,
 ) : ViewModel() {
 
     private val status = MutableStateFlow(LoadStatus())
@@ -141,11 +210,18 @@ class HomeViewModel(
         repository.sessions(serverId, if (all) null else profile)
     }
 
-    val state: StateFlow<HomeUiState> = combine(sessions, status, panels, search, scope) { list, load, panel, find, (profile, all) ->
+    private val clock: Flow<PartOfDay> = flow {
+        while (true) {
+            emit(partOfDay(LocalTime.now()))
+            delay(60_000)
+        }
+    }.distinctUntilChanged()
+
+    private val listing = combine(sessions, status, panels, search, scope) { list, load, panel, find, (profile, all) ->
         val now = Instant.now()
         val lane = panel.selectedProject?.let { id -> panel.lanes?.firstOrNull { it.id == id } }
-        val visible = if (lane == null) list else list.filter { it.key in lane.sessionKeys }
-        val rows = visible.map { it.toRow(now) }
+        val allRows = list.map { it.toRow(now) }
+        val rows = if (lane == null) allRows else allRows.filter { StoredKey(it.key) in lane.sessionKeys }
         val content = when {
             rows.isNotEmpty() -> SessionsContent.Success(rows.filter { it.pinned }, rows.filterNot { it.pinned })
             !load.loaded -> SessionsContent.Loading
@@ -181,8 +257,19 @@ class HomeViewModel(
             search = if (!find.open) SearchUi.Closed else SearchUi.Open(find.query, find.searching, searchResults(find, list, now)),
             toast = panel.toast,
             projectSheet = panel.projectSheet,
+            connection = ConnectionState.Online,
+            companion = DefaultCompanion,
+            thought = CompanionThought.Loading,
+        ) to Listing(load.loaded, allRows)
+    }
+
+    val state: StateFlow<HomeUiState> = combine(listing, connection, companion, clock) { (base, listed), link, buddy, part ->
+        base.copy(
+            connection = link,
+            companion = buddy,
+            thought = companionThought(link, listed.loaded, listed.rows, buddy, part),
         )
-    }.combine(connection) { state, link -> state.copy(connection = link) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initialState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initialState())
 
     init {
         refresh()
@@ -208,7 +295,22 @@ class HomeViewModel(
         search = SearchUi.Closed,
         toast = null,
         projectSheet = ProjectSheet.Hidden,
+        connection = ConnectionState.Online,
+        companion = DefaultCompanion,
+        thought = CompanionThought.Loading,
     )
+
+    fun renameCompanion(name: String) {
+        viewModelScope.launch { companionStore.setCompanionName(name) }
+    }
+
+    fun setCompanionColor(color: MascotColor) {
+        viewModelScope.launch { companionStore.setCompanionColor(color) }
+    }
+
+    fun setCompanionMascot(id: MascotId) {
+        viewModelScope.launch { companionStore.setCompanionMascot(id) }
+    }
 
     fun refresh(silent: Boolean = false) {
         if (refreshJob?.isActive == true) return
@@ -438,7 +540,7 @@ class HomeViewModel(
         return (local + server).map { it.toRow(now) }
     }
 
-    companion object {
+    companion object Paging {
         private const val PAGE = 50
     }
 }
@@ -454,6 +556,7 @@ private fun SessionSummary.toRow(now: Instant): SessionRowUi = SessionRowUi(
     unread = unread,
     pinned = pinned,
     cwd = cwd,
+    active = isActive,
 )
 
 fun relativeTime(then: Instant, now: Instant): String {

@@ -1,9 +1,7 @@
 package com.hermeh.android.feature.onboarding
 
 import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -70,7 +68,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -84,7 +81,6 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -100,7 +96,11 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.hermeh.android.AppGraph
 import com.hermeh.android.R
+import com.hermeh.android.core.designsystem.HermehType
+import com.hermeh.android.core.designsystem.Mascot
 import com.hermeh.android.core.designsystem.Onboarding
+import com.hermeh.android.core.model.MascotCatalog
+import com.hermeh.android.core.model.MascotMood
 import com.hermeh.android.core.model.ServerConfig
 import kotlinx.coroutines.launch
 
@@ -269,7 +269,7 @@ private fun WelcomePage() {
             Canvas(Modifier.size(322.dp)) {
                 drawCircle(
                     Brush.radialGradient(
-                        0f to Color(0xFFFFBD1A).copy(alpha = 0.55f),
+                        0f to Onboarding.sunny.copy(alpha = 0.5f),
                         0.5f to Onboarding.glow.copy(alpha = 0.22f),
                         1f to Color.Transparent,
                     ),
@@ -283,19 +283,7 @@ private fun WelcomePage() {
                     radius = size.minDimension * 0.35f,
                 )
             }
-            val shape = RoundedCornerShape(27.dp)
-            Image(
-                painter = painterResource(R.drawable.hermes_app_icon),
-                contentDescription = "Hermeh",
-                modifier = Modifier
-                    .size(124.dp)
-                    .shadow(24.dp, shape, ambientColor = Onboarding.glow, spotColor = Onboarding.glow)
-                    .clip(shape)
-                    .border(
-                        BorderStroke(1.dp, Brush.linearGradient(listOf(White.copy(alpha = 0.25f), White.copy(alpha = 0.04f)))),
-                        shape,
-                    ),
-            )
+            Mascot(MascotCatalog.Hermeh, Onboarding.sunny, MascotMood.Happy, 124.dp, Modifier.testTag("onboarding.mascot"))
         }
         Spacer(Modifier.weight(1f).heightIn(min = 32.dp))
         Column(
@@ -303,14 +291,13 @@ private fun WelcomePage() {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                "Control your Hermes agent from your Android phone.",
+                "Meet Hermeh, your agent's companion.",
                 color = White,
-                fontSize = 31.sp,
-                lineHeight = 36.sp,
-                fontWeight = FontWeight.Bold,
+                style = HermehType.hero,
+                modifier = Modifier.testTag("onboarding.headline"),
             )
             Text(
-                "Connect to your self-hosted server over a private network, such as Tailscale or NetBird.",
+                "Control your Hermes agent from your Android phone. Connect to your self-hosted server over a private network, such as Tailscale or NetBird.",
                 color = White.copy(alpha = 0.58f),
                 fontSize = 14.sp,
             )
@@ -341,7 +328,7 @@ private fun HeroBadge(icon: ImageVector, title: String) {
 private data class Feature(val icon: ImageVector, val color: Color, val title: String, val subtitle: String)
 
 private val features = listOf(
-    Feature(Icons.Filled.Forum, Onboarding.amber, "Chat with your Hermes agent from your phone", "Drive conversations from anywhere on your tailnet."),
+    Feature(Icons.Filled.Forum, Onboarding.sunny, "Chat with your Hermes agent from your phone", "Drive conversations from anywhere on your tailnet."),
     Feature(Icons.AutoMirrored.Filled.ViewList, Color(0xFF34C759), "Manage sessions, tasks, and files remotely", "Browse workspaces and stay on top of agent work."),
     Feature(Icons.Filled.Mic, Color(0xFFAF52DE), "Voice input and mobile-friendly composer controls", "Compose naturally with touch-first controls."),
     Feature(Icons.Filled.VerifiedUser, Color(0xFF32ADE6), "Review approvals and clarifications inline", "Respond to agent prompts without switching apps."),
@@ -390,13 +377,13 @@ private fun StepHeader(step: Int, icon: ImageVector, title: String, description:
                 .size(80.dp)
                 .clip(RoundedCornerShape(22.dp))
                 .background(White.copy(alpha = 0.06f))
-                .border(1.dp, Onboarding.amber.copy(alpha = 0.35f), RoundedCornerShape(22.dp)),
+                .border(1.dp, Onboarding.sunny.copy(alpha = 0.35f), RoundedCornerShape(22.dp)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(icon, contentDescription = null, tint = White, modifier = Modifier.size(32.dp))
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("STEP $step", color = Onboarding.amber.copy(alpha = 0.8f), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+            Text("STEP $step", color = Onboarding.sunny.copy(alpha = 0.8f), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
             Text(title, color = White, fontSize = 28.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, lineHeight = 33.sp)
             Text(description, color = White.copy(alpha = 0.45f), fontSize = 14.sp, textAlign = TextAlign.Center)
         }
@@ -464,8 +451,8 @@ private fun ReachabilityPage() {
                 "Keep it connected while using Hermeh.",
             ).forEachIndexed { index, text ->
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(Modifier.size(23.dp).clip(CircleShape).background(Onboarding.amber), contentAlignment = Alignment.Center) {
-                        Text("${index + 1}", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Box(Modifier.size(23.dp).clip(CircleShape).background(Onboarding.sunny), contentAlignment = Alignment.Center) {
+                        Text("${index + 1}", color = Onboarding.onSunny, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                     Text(text, color = White.copy(alpha = 0.72f), fontSize = 14.sp)
                 }
@@ -481,8 +468,8 @@ private fun ReachabilityPage() {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = Onboarding.amber, modifier = Modifier.size(18.dp))
-                Text("Get Tailscale on Google Play", color = Onboarding.amber, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = Onboarding.sunny, modifier = Modifier.size(18.dp))
+                Text("Get Tailscale on Google Play", color = Onboarding.sunny, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -583,8 +570,8 @@ private fun ConnectPage(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    Icon(Icons.Filled.Add, contentDescription = null, tint = Onboarding.amber, modifier = Modifier.size(18.dp))
-                    Text("Add header", color = Onboarding.amber, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Icon(Icons.Filled.Add, contentDescription = null, tint = Onboarding.sunny, modifier = Modifier.size(18.dp))
+                    Text("Add header", color = Onboarding.sunny, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -641,7 +628,7 @@ private fun OnboardingField(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Icon(icon, contentDescription = null, tint = Onboarding.amber, modifier = Modifier.width(24.dp).size(18.dp))
+        Icon(icon, contentDescription = null, tint = Onboarding.sunny, modifier = Modifier.width(24.dp).size(18.dp))
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, color = White.copy(alpha = 0.5f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             BasicTextField(
@@ -649,7 +636,7 @@ private fun OnboardingField(
                 onValueChange = onValueChange,
                 singleLine = true,
                 textStyle = TextStyle(color = White, fontSize = 16.sp, fontWeight = FontWeight.Medium),
-                cursorBrush = SolidColor(Onboarding.amber),
+                cursorBrush = SolidColor(Onboarding.sunny),
                 visualTransformation = if (secure) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
                 keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction, autoCorrectEnabled = false),
                 keyboardActions = KeyboardActions(onGo = { onGo() }),
@@ -672,7 +659,7 @@ private fun PlainField(value: String, onValueChange: (String) -> Unit, placehold
         onValueChange = onValueChange,
         singleLine = true,
         textStyle = TextStyle(color = White, fontSize = 14.sp),
-        cursorBrush = SolidColor(Onboarding.amber),
+        cursorBrush = SolidColor(Onboarding.sunny),
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
             .background(Color.Black.copy(alpha = 0.24f))
@@ -713,7 +700,7 @@ private fun PrimaryButton(
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(Onboarding.amber.copy(alpha = if (enabled) 1f else 0.5f))
+            .background(Onboarding.sunny.copy(alpha = if (enabled) 1f else 0.5f))
             .clickable(enabled = enabled, onClick = onClick)
             .heightIn(min = 48.dp)
             .padding(horizontal = 10.dp, vertical = 15.dp),
@@ -721,10 +708,10 @@ private fun PrimaryButton(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
-            Icon(icon, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+            Icon(icon, contentDescription = null, tint = Onboarding.onSunny, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
         }
-        Text(text, color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        Text(text, color = Onboarding.onSunny, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 

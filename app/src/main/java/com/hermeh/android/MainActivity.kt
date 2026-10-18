@@ -18,12 +18,11 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.hermeh.android.core.data.AppearancePrefs
-import com.hermeh.android.core.data.LogoColor
 import com.hermeh.android.core.data.ThemeMode
 import com.hermeh.android.core.designsystem.HermehTheme
 import com.hermeh.android.core.designsystem.Onboarding
 import com.hermeh.android.core.model.AuthState
+import com.hermeh.android.core.model.DefaultCompanion
 import com.hermeh.android.feature.onboarding.OnboardingRoute
 import com.hermeh.android.navigation.HermehNavHost
 
@@ -33,21 +32,22 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val graph = (application as HermehApplication).graph
         setContent {
-            val appearance by graph.store.appearance.collectAsStateWithLifecycle(AppearancePrefs(ThemeMode.System, LogoColor.Yellow))
+            val theme by graph.store.theme.collectAsStateWithLifecycle(ThemeMode.System)
+            val companion by graph.store.companion.collectAsStateWithLifecycle(DefaultCompanion)
             val auth by graph.auth.state.collectAsStateWithLifecycle()
             val onboarded by graph.store.onboarded.collectAsStateWithLifecycle<Boolean?>(null)
             val signedIn = auth is AuthState.SignedIn
             val dark = when {
                 !signedIn -> true
-                appearance.theme == ThemeMode.Dark -> true
-                appearance.theme == ThemeMode.Light -> false
+                theme == ThemeMode.Dark -> true
+                theme == ThemeMode.Light -> false
                 else -> isSystemInDarkTheme()
             }
             LaunchedEffect(dark) {
                 val style = if (dark) SystemBarStyle.dark(Color.TRANSPARENT) else SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
                 enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
             }
-            HermehTheme(mode = if (signedIn) appearance.theme else ThemeMode.Dark, logo = appearance.logo) {
+            HermehTheme(mode = if (signedIn) theme else ThemeMode.Dark, mascot = companion.color) {
                 Root(auth = auth, onboarded = onboarded, graph = graph)
             }
         }

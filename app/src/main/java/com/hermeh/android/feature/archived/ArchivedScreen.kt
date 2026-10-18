@@ -46,6 +46,7 @@ import com.hermeh.android.core.data.SessionRepository
 import com.hermeh.android.core.designsystem.GlassCircleButton
 import com.hermeh.android.core.designsystem.AutomationAccessibilityRefresh
 import com.hermeh.android.core.designsystem.HermehTheme
+import com.hermeh.android.core.designsystem.HermehType
 import com.hermeh.android.core.model.SessionSummary
 import com.hermeh.android.core.model.StoredKey
 import kotlinx.coroutines.CancellationException
@@ -147,7 +148,7 @@ fun ArchivedScreen(
     Column(modifier.fillMaxSize().background(colors.background).windowInsetsPadding(WindowInsets.statusBars)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             GlassCircleButton(Icons.AutoMirrored.Filled.ArrowBack, "Back", onBack, Modifier.testTag("archived.back"))
-            Text("Archived Sessions", color = colors.label, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 14.dp))
+            Text("Archived Sessions", style = HermehType.screenTitle, color = colors.label, modifier = Modifier.padding(start = 14.dp))
         }
         when (state) {
             ArchivedUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

@@ -14,16 +14,15 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.hermeh.android.AppGraph
-import com.hermeh.android.core.data.AppearancePrefs
 import com.hermeh.android.core.data.MemoryRepository
 import com.hermeh.android.core.data.SkillsRepository
 import com.hermeh.android.core.data.TasksRepository
 import com.hermeh.android.core.data.UsageRepository
-import com.hermeh.android.core.data.LogoColor
 import com.hermeh.android.core.data.ThemeMode
 import com.hermeh.android.core.data.BotsRepository
 import com.hermeh.android.core.data.KanbanRepository
 import com.hermeh.android.core.model.AuthState
+import com.hermeh.android.core.model.DefaultCompanion
 import com.hermeh.android.feature.archived.ArchivedRoute
 import com.hermeh.android.feature.archived.ArchivedViewModel
 import com.hermeh.android.core.model.CardId
@@ -93,6 +92,8 @@ fun HermehNavHost(graph: AppGraph, auth: AuthState.SignedIn) {
                             pickProfile = graph.auth::pickProfile,
                             sessionsChanged = graph.sessionsChanged,
                             connection = graph.connection,
+                            companion = graph.store.companion,
+                            companionStore = graph.store,
                         )
                     }
                 },
@@ -173,13 +174,17 @@ fun HermehNavHost(graph: AppGraph, auth: AuthState.SignedIn) {
             FileViewerRoute(viewModel = viewModel, path = route.path, onBack = { nav.popBackStack() })
         }
         composable<SettingsRouteKey> {
-            val appearance by graph.store.appearance.collectAsStateWithLifecycle(AppearancePrefs(ThemeMode.System, LogoColor.Yellow))
+            val theme by graph.store.theme.collectAsStateWithLifecycle(ThemeMode.System)
+            val companion by graph.store.companion.collectAsStateWithLifecycle(DefaultCompanion)
             SettingsScreen(
                 auth = auth,
-                appearance = appearance,
+                theme = theme,
+                companion = companion,
                 onBack = { nav.popBackStack() },
                 onTheme = { scope.launch { graph.store.setTheme(it) } },
-                onLogo = { scope.launch { graph.store.setLogo(it) } },
+                onCompanionName = { scope.launch { graph.store.setCompanionName(it) } },
+                onCompanionColor = { scope.launch { graph.store.setCompanionColor(it) } },
+                onCompanionMascot = { scope.launch { graph.store.setCompanionMascot(it) } },
                 onSignOut = { graph.appScope.launch { graph.signOut() } },
             )
         }
