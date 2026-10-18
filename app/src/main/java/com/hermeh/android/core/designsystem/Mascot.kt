@@ -32,7 +32,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
@@ -94,13 +93,11 @@ fun Mascot(
         flap = still
         blink = still
     }
-    Box(modifier.size(size)) {
+    Box(modifier.size(size).semantics { contentDescription = "$name, ${mood.words()}" }) {
         Canvas(
             Modifier
                 .fillMaxSize()
-                .graphicsLayer { translationY = bob.value * 0.03f * this.size.height }
-                .semantics { contentDescription = "$name, ${mood.words()}" }
-                .testTag("mascot"),
+                .graphicsLayer { translationY = bob.value * 0.03f * this.size.height },
         ) {
             when (mascot.art) {
                 MascotArt.WingedBlob -> drawWingedBlob(color, mood, stroke, badge, sleepy, flap.value, blink.value)

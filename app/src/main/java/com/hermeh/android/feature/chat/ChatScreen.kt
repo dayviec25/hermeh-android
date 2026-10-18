@@ -194,11 +194,12 @@ fun ChatScreen(
     ) {
         val ready = state as? ChatUiState.Ready
         val cwd = ready?.chat?.cwd
+        val mood = ready?.let { headerMood(it.chat.run, it.chat.pending.isNotEmpty(), it.connection) } ?: MascotMood.Idle
         ChatHeader(
             title = ready?.chat?.title?.takeIf { it.isNotBlank() } ?: "New chat",
             subtitle = ready?.profile?.value?.let { "${companion.name} · $it" } ?: companion.name,
             companion = companion,
-            mood = ready?.let { headerMood(it.chat.run, it.chat.pending.isNotEmpty(), it.connection) } ?: MascotMood.Idle,
+            mood = mood,
             onBack = onBack,
             onFiles = cwd?.let { path -> { onOpenFiles(path) } },
         )
@@ -217,7 +218,7 @@ fun ChatScreen(
             is ChatUiState.Ready -> {
                 if (state.savedCopy) SavedCopyNote(onRetry)
                 if (state.chat.items.isEmpty() && !state.refreshing) {
-                    EmptyChat(companion, onStarter = onInput, modifier = Modifier.weight(1f))
+                    EmptyChat(companion, mood, onStarter = onInput, modifier = Modifier.weight(1f))
                 } else {
                     Transcript(state.chat.items, companion, onFork, Modifier.weight(1f))
                 }
@@ -901,10 +902,11 @@ private fun headerMood(run: RunState, pending: Boolean, connection: ConnectionSt
 }
 
 @Composable
-private fun EmptyChat(companion: Companion, onStarter: (String) -> Unit, modifier: Modifier = Modifier) {
+private fun EmptyChat(companion: Companion, mood: MascotMood, onStarter: (String) -> Unit, modifier: Modifier = Modifier) {
     val colors = HermehTheme.colors
     BoxWithConstraints(modifier.fillMaxWidth().testTag("chat.empty")) {
         val width = maxWidth
+        val mascotSize = if (maxHeight < 320.dp) 64.dp else 120.dp
         Column(
             Modifier
                 .fillMaxWidth()
@@ -914,7 +916,7 @@ private fun EmptyChat(companion: Companion, onStarter: (String) -> Unit, modifie
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Mascot(MascotCatalog.find(companion.mascot), colors.mascot, MascotMood.Idle, 120.dp, name = companion.name)
+            Mascot(MascotCatalog.find(companion.mascot), colors.mascot, mood, mascotSize, name = companion.name)
             Spacer(Modifier.size(10.dp))
             Text(
                 "What should we work on?",
