@@ -9,6 +9,7 @@ import com.hermex.android.core.model.ProjectLane
 import com.hermex.android.core.model.SessionSummary
 import com.hermex.android.core.model.StoredKey
 import com.hermex.android.core.network.HermesFailure
+import com.hermex.android.core.model.ConnectionState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -90,6 +91,7 @@ data class HomeUiState(
     val search: SearchUi,
     val toast: HomeToast?,
     val projectSheet: ProjectSheet,
+    val connection: ConnectionState = ConnectionState.Online,
 )
 
 private data class LoadStatus(
@@ -123,6 +125,7 @@ class HomeViewModel(
     private val showAllProfiles: StateFlow<Boolean>,
     private val pickProfile: suspend (String, Boolean) -> Unit,
     sessionsChanged: Flow<Unit>,
+    connection: Flow<ConnectionState>,
 ) : ViewModel() {
 
     private val status = MutableStateFlow(LoadStatus())
@@ -179,7 +182,7 @@ class HomeViewModel(
             toast = panel.toast,
             projectSheet = panel.projectSheet,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initialState())
+    }.combine(connection) { state, link -> state.copy(connection = link) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initialState())
 
     init {
         refresh()

@@ -24,6 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -83,6 +84,41 @@ fun PanelTopBar(
             )
         }
     }
+}
+
+@Composable
+fun EditorTopBar(
+    confirmLabel: String,
+    canConfirm: Boolean,
+    saving: Boolean,
+    onCancel: () -> Unit,
+    onConfirm: () -> Unit,
+    cancelTag: String,
+    confirmTag: String,
+    modifier: Modifier = Modifier,
+    title: @Composable ColumnScope.() -> Unit,
+) {
+    val colors = HermexTheme.colors
+    Row(modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp).heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+        TextButton(onClick = onCancel, enabled = !saving, modifier = Modifier.testTag(cancelTag)) {
+            Text("Cancel", color = colors.label, fontSize = 16.sp)
+        }
+        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, content = title)
+        Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
+            if (saving) {
+                CircularProgressIndicator(Modifier.padding(horizontal = 24.dp).size(18.dp), color = colors.secondaryLabel, strokeWidth = 2.dp)
+            } else {
+                TextButton(onClick = onConfirm, enabled = canConfirm, modifier = Modifier.testTag(confirmTag)) {
+                    Text(confirmLabel, color = if (canConfirm) colors.accent else colors.tertiaryLabel, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EditorTitle(text: String) {
+    Text(text, color = HermexTheme.colors.label, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
 
 @Composable

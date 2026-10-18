@@ -144,6 +144,13 @@ sealed interface PendingRequest {
     data class Credential(override val envelopeId: String, val kind: String, val prompt: String) : PendingRequest
 }
 
+sealed interface ConnectionState {
+    data object Online : ConnectionState
+    data object Reconnecting : ConnectionState
+    data object WaitingForNetwork : ConnectionState
+    data class Failed(val message: String) : ConnectionState
+}
+
 sealed interface RunState {
     data object Idle : RunState
     data class Working(val since: Instant, val caption: String) : RunState

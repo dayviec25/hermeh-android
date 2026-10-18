@@ -93,6 +93,7 @@ import com.hermex.android.core.designsystem.HermexTheme
 import com.hermex.android.core.designsystem.glassSurface
 import com.hermex.android.core.model.ApprovalChoice
 import com.hermex.android.core.model.PendingRequest
+import com.hermex.android.core.model.ConnectionState
 import com.hermex.android.core.model.RunState
 import com.hermex.android.core.model.TranscriptItem
 import kotlinx.coroutines.delay
@@ -215,7 +216,7 @@ fun ChatScreen(
                         )
                     }
                 }
-                RunStatusCapsule(state.chat.run)
+                RunStatusCapsule(state.chat.run, state.connection)
                 Composer(
                     state = state,
                     onInput = onInput,
@@ -568,19 +569,22 @@ private fun TextRequestCard(
 }
 
 @Composable
-private fun RunStatusCapsule(run: RunState) {
+private fun RunStatusCapsule(run: RunState, connection: ConnectionState) {
     val colors = HermexTheme.colors
-    val (caption, since, tint) = when (run) {
-        RunState.Idle -> return
-        is RunState.Working -> Triple(run.caption, run.since, colors.working)
-        RunState.WaitingForYou -> Triple(CAPTION_WAITING, null, colors.approval)
-        RunState.Stopping -> Triple(CAPTION_STOPPING, null, colors.danger)
-        RunState.Reconnecting -> Triple(CAPTION_RECONNECTING, null, colors.secondaryLabel)
+    val (caption, since, tint) = when (connection) {
+        ConnectionState.WaitingForNetwork -> Triple(CAPTION_WAITING_NETWORK, null, colors.secondaryLabel)
+        ConnectionState.Reconnecting -> Triple(CAPTION_RECONNECTING, null, colors.secondaryLabel)
+        is ConnectionState.Failed -> Triple(CAPTION_DISCONNECTED, null, colors.danger)
+        ConnectionState.Online -> when (run) {
+            RunState.Idle -> return
+            is RunState.Working -> Triple(run.caption, run.since, colors.working)
+            RunState.WaitingForYou -> Triple(CAPTION_WAITING, null, colors.approval)
+            RunState.Stopping -> Triple(CAPTION_STOPPING, null, colors.danger)
+            RunState.Reconnecting -> Triple(CAPTION_RECONNECTING, null, colors.secondaryLabel)
+        }
     }
-    val spoken = when (run) {
-        is RunState.Working -> CAPTION_WORKING
-        else -> caption
-    }
+    val offline = connection != ConnectionState.Online
+    val spoken = if (!offline && run is RunState.Working) CAPTION_WORKING else caption
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(run) {
         while (true) {
@@ -603,7 +607,7 @@ private fun RunStatusCapsule(run: RunState) {
             horizontalArrangement = Arrangement.spacedBy(7.dp),
         ) {
             Box(Modifier.size(7.dp).clip(CircleShape).background(tint))
-            Text(timer, color = colors.secondaryLabel, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace)
+            if (!offline) Text(timer, color = colors.secondaryLabel, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace)
             Text(caption, color = colors.label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 240.dp))
         }
     }
@@ -773,7 +777,7 @@ private fun ModelPickerSheet(
     onSelect: (ModelOption) -> Unit,
 ) {
     val colors = HermexTheme.colors
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = colors.secondaryBackground) {
         Column(Modifier.fillMaxWidth().semantics { testTagsAsResourceId = true }.testTag("chat.modelPicker")) {
             Text("Model", color = colors.label, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))

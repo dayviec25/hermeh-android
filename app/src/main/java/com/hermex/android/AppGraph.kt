@@ -12,13 +12,21 @@ import com.hermex.android.core.data.SecretCipher
 import com.hermex.android.core.data.SessionRepository
 import com.hermex.android.core.data.db.HermexDatabase
 import com.hermex.android.core.model.AuthState
+import com.hermex.android.core.model.ConnectionState
 import com.hermex.android.core.network.GatewayTarget
 import com.hermex.android.core.network.HermesGateway
+import com.hermex.android.core.network.NetworkMonitor
+import com.hermex.android.core.network.connectionState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
@@ -44,7 +52,12 @@ class AppGraph(context: Context) {
         auth.authorized { rest -> GatewayTarget(rest.gatewayUrl(), rest.wsTicket(), rest.headers) }
     }
 
-    val chat by lazy { ChatRepository(auth, gateway, database.transcripts()) }
+    val network = NetworkMonitor(context.applicationContext, appScope)
+
+    val connection: StateFlow<ConnectionState> = combine(gateway.status, network.online, ::connectionState)
+        .stateIn(appScope, SharingStarted.Eagerly, ConnectionState.Online)
+
+    val chat by lazy { ChatRepository(auth, gateway, database.transcripts(), connection) }
     val sessions by lazy {
         SessionRepository(auth, database.sessions(), gateway, { chat.attachedRuntimes }, { chat.forgetRuntime(it) })
     }
@@ -66,6 +79,8 @@ class AppGraph(context: Context) {
 
     fun start() {
         appScope.launch { auth.bootstrap() }
+        // A socket on a lost network never errors on its own; a returning network should not wait out the backoff.
+        appScope.launch { network.online.drop(1).collect { gateway.reconnectNow() } }
         appScope.launch(Dispatchers.Main) {
             ProcessLifecycleOwner.get().lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 try {

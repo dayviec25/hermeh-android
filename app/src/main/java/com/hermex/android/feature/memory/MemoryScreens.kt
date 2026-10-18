@@ -62,6 +62,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hermex.android.R
+import com.hermex.android.core.designsystem.EditorTitle
+import com.hermex.android.core.designsystem.EditorTopBar
 import com.hermex.android.core.designsystem.HermexTheme
 import com.hermex.android.core.model.MemoryEntry
 import com.hermex.android.core.model.MemorySection
@@ -209,29 +211,23 @@ internal fun MemoryEditScreen(
 ) {
     val colors = HermexTheme.colors
     PanelScaffold(modifier) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp).heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onCancel, enabled = draft?.saving != true, modifier = Modifier.testTag("memory.cancel")) {
-                Text("Cancel", color = colors.label, fontSize = 16.sp)
-            }
-            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Edit ${section.title}", color = colors.label, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, maxLines = 1)
-                if (draft?.limit != null) {
-                    Text(
-                        "${String.format(Locale.getDefault(), "%,d", draft.count)} of ${String.format(Locale.getDefault(), "%,d", draft.limit)} characters",
-                        color = if (draft.isOver) colors.danger else colors.secondaryLabel,
-                        fontSize = 12.sp,
-                        modifier = Modifier.testTag("memory.counter"),
-                    )
-                }
-            }
-            Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
-                if (draft?.saving == true) {
-                    CircularProgressIndicator(Modifier.padding(horizontal = 24.dp).size(18.dp), color = colors.secondaryLabel, strokeWidth = 2.dp)
-                } else {
-                    TextButton(onClick = onSave, enabled = draft?.canSave == true, modifier = Modifier.testTag("memory.save")) {
-                        Text("Save", color = if (draft?.canSave == true) colors.accent else colors.tertiaryLabel, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                }
+        EditorTopBar(
+            confirmLabel = "Save",
+            canConfirm = draft?.canSave == true,
+            saving = draft?.saving == true,
+            onCancel = onCancel,
+            onConfirm = onSave,
+            cancelTag = "memory.cancel",
+            confirmTag = "memory.save",
+        ) {
+            EditorTitle("Edit ${section.title}")
+            if (draft?.limit != null) {
+                Text(
+                    "${String.format(Locale.getDefault(), "%,d", draft.count)} of ${String.format(Locale.getDefault(), "%,d", draft.limit)} characters",
+                    color = if (draft.isOver) colors.danger else colors.secondaryLabel,
+                    fontSize = 12.sp,
+                    modifier = Modifier.testTag("memory.counter"),
+                )
             }
         }
         if (draft == null) {

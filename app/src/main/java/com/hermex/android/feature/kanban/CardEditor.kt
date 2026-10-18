@@ -48,6 +48,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.hermex.android.core.designsystem.EditorTitle
+import com.hermex.android.core.designsystem.EditorTopBar
 import com.hermex.android.core.designsystem.HermexTheme
 import com.hermex.android.core.model.CardDraft
 import com.hermex.android.core.model.KanbanStatus
@@ -86,45 +88,28 @@ fun CardEditorDialog(
                 .windowInsetsPadding(WindowInsets.systemBars)
                 .imePadding(),
         ) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onDismiss, modifier = Modifier.testTag("editor.cancel")) {
-                    Text("Cancel", color = colors.accent, fontSize = 16.sp)
-                }
-                Text(
-                    if (creating) "New Card" else "Edit Card",
-                    color = colors.label,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                )
-                Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
-                    if (editor.saving) {
-                        CircularProgressIndicator(strokeWidth = 2.dp, color = colors.secondaryLabel, modifier = Modifier.padding(horizontal = 20.dp).size(20.dp))
-                    } else {
-                        TextButton(
-                            onClick = {
-                                onSave(
-                                    CardDraft(
-                                        title = title,
-                                        body = body,
-                                        status = status,
-                                        priority = priorityValue ?: 0,
-                                        assignee = assignee,
-                                        workspaceKind = workspace,
-                                        skills = skills.split(',').map { it.trim() }.filter { it.isNotEmpty() },
-                                        maxRuntimeSeconds = runtimeValue,
-                                    ),
-                                )
-                            },
-                            enabled = canSave,
-                            modifier = Modifier.testTag("editor.save"),
-                        ) {
-                            Text(if (creating) "Create" else "Save", color = if (canSave) colors.accent else colors.tertiaryLabel, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                        }
-                    }
-                }
-            }
+            EditorTopBar(
+                confirmLabel = if (creating) "Create" else "Save",
+                canConfirm = canSave,
+                saving = editor.saving,
+                onCancel = onDismiss,
+                onConfirm = {
+                    onSave(
+                        CardDraft(
+                            title = title,
+                            body = body,
+                            status = status,
+                            priority = priorityValue ?: 0,
+                            assignee = assignee,
+                            workspaceKind = workspace,
+                            skills = skills.split(',').map { it.trim() }.filter { it.isNotEmpty() },
+                            maxRuntimeSeconds = runtimeValue,
+                        ),
+                    )
+                },
+                cancelTag = "editor.cancel",
+                confirmTag = "editor.save",
+            ) { EditorTitle(if (creating) "New Card" else "Edit Card") }
             Column(
                 Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp),
             ) {

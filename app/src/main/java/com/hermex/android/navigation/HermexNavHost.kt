@@ -92,6 +92,7 @@ fun HermexNavHost(graph: AppGraph, auth: AuthState.SignedIn) {
                             showAllProfiles = graph.auth.showAllProfiles,
                             pickProfile = graph.auth::pickProfile,
                             sessionsChanged = graph.sessionsChanged,
+                            connection = graph.connection,
                         )
                     }
                 },

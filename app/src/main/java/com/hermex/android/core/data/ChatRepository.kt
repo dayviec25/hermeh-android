@@ -5,6 +5,7 @@ import com.hermex.android.core.data.db.TranscriptRowEntity
 import com.hermex.android.core.model.ApprovalChoice
 import com.hermex.android.core.model.AuthState
 import com.hermex.android.core.model.BranchResult
+import com.hermex.android.core.model.ConnectionState
 import com.hermex.android.core.network.HermesFailure
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -29,6 +30,7 @@ import com.hermex.android.core.network.obj
 import com.hermex.android.core.network.str
 import com.hermex.android.core.network.textOrNull
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -54,6 +56,7 @@ class ChatRepository(
     private val auth: AuthRepository,
     private val gateway: HermesGateway,
     private val cache: TranscriptDao,
+    val connection: StateFlow<ConnectionState>,
 ) {
     val events: Flow<GatewayEnvelope> get() = gateway.events
     val status get() = gateway.status

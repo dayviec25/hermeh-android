@@ -33,6 +33,8 @@ data class ChatState(
 const val CAPTION_WORKING = "Hermes is working"
 const val CAPTION_STARTING = "Starting response"
 const val CAPTION_RECONNECTING = "Reconnecting stream"
+const val CAPTION_WAITING_NETWORK = "Waiting for network"
+const val CAPTION_DISCONNECTED = "Not connected"
 const val CAPTION_WAITING = "Waiting for you"
 const val CAPTION_STOPPING = "Stopping response"
 

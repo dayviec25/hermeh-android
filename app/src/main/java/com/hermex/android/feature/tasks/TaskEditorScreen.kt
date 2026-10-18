@@ -60,6 +60,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hermex.android.core.data.ModelOption
+import com.hermex.android.core.designsystem.EditorTitle
+import com.hermex.android.core.designsystem.EditorTopBar
 import com.hermex.android.core.designsystem.HermexTheme
 import com.hermex.android.core.model.CronDraft
 
@@ -99,33 +101,15 @@ internal fun TaskEditorScreen(
     var skillsPicker by remember { mutableStateOf(false) }
     val draft = state.draft
     PanelScaffold(modifier) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp).heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onCancel, enabled = !state.saving, modifier = Modifier.testTag("editor.cancel")) {
-                Text("Cancel", color = colors.label, fontSize = 16.sp)
-            }
-            Text(
-                if (state.isNew) "New Task" else "Edit Task",
-                color = colors.label, fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center, modifier = Modifier.weight(1f),
-            )
-            Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
-                if (state.saving) {
-                    CircularProgressIndicator(Modifier.padding(horizontal = 24.dp).size(18.dp), color = colors.secondaryLabel, strokeWidth = 2.dp)
-                } else {
-                    TextButton(
-                        onClick = onSave,
-                        enabled = draft != null && draft.validationMessage == null,
-                        modifier = Modifier.testTag("editor.save"),
-                    ) {
-                        Text(
-                            if (state.isNew) "Create" else "Save",
-                            color = if (draft?.validationMessage == null && draft != null) colors.accent else colors.tertiaryLabel,
-                            fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                }
-            }
-        }
+        EditorTopBar(
+            confirmLabel = if (state.isNew) "Create" else "Save",
+            canConfirm = draft != null && draft.validationMessage == null,
+            saving = state.saving,
+            onCancel = onCancel,
+            onConfirm = onSave,
+            cancelTag = "editor.cancel",
+            confirmTag = "editor.save",
+        ) { EditorTitle(if (state.isNew) "New Task" else "Edit Task") }
         when (val content = state.content) {
             EditorUiState.Loading -> LoadingState("Loading task...")
             is EditorUiState.Error -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

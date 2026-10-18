@@ -1,6 +1,7 @@
 package com.hermex.android.feature.home
 
 import androidx.annotation.DrawableRes
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -72,7 +73,10 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
@@ -83,6 +87,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hermex.android.R
+import com.hermex.android.core.model.ConnectionState
 import com.hermex.android.core.designsystem.HermexColors
 import com.hermex.android.core.designsystem.AutomationAccessibilityRefresh
 import com.hermex.android.core.designsystem.HermexTheme
@@ -199,6 +204,12 @@ fun HomeScreen(
         onDelete = { deleting = it },
     )
     val search = state.search as? SearchUi.Open
+    val keyboard = LocalSoftwareKeyboardController.current
+    val closeSearch = {
+        keyboard?.hide()
+        actions.onCloseSearch()
+    }
+    BackHandler(enabled = search != null, onBack = closeSearch)
     Box(modifier.fillMaxSize().background(colors.background)) {
         PullToRefreshBox(
             isRefreshing = state.refreshing,
@@ -210,7 +221,10 @@ fun HomeScreen(
                 contentPadding = PaddingValues(bottom = 120.dp),
             ) {
                 item(key = "header", contentType = "header") {
-                    Header(initials = initials, search = search, actions = actions)
+                    Header(initials = initials, search = search, actions = actions, onCloseSearch = closeSearch)
+                }
+                if (state.connection != ConnectionState.Online) {
+                    item(key = "connection", contentType = "connection") { ConnectionBanner(state.connection) }
                 }
                 if (search != null && search.query.isNotBlank()) {
                     searchResults(search, rowActions)
@@ -493,7 +507,32 @@ private fun SectionTitle(title: String, state: HomeUiState, actions: HomeActions
 }
 
 @Composable
-private fun Header(initials: String, search: SearchUi.Open?, actions: HomeActions) {
+private fun ConnectionBanner(connection: ConnectionState, modifier: Modifier = Modifier) {
+    val colors = HermexTheme.colors
+    val (text, tint) = when (connection) {
+        ConnectionState.Online -> return
+        ConnectionState.Reconnecting -> "Reconnecting to Hermes" to colors.secondaryLabel
+        ConnectionState.WaitingForNetwork -> "Offline. Waiting for network" to colors.secondaryLabel
+        is ConnectionState.Failed -> "Not connected to Hermes" to colors.danger
+    }
+    Box(modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 12.dp), contentAlignment = Alignment.Center) {
+        Row(
+            Modifier
+                .glassSurface(CircleShape)
+                .padding(horizontal = 12.dp, vertical = 7.dp)
+                .testTag("home.connection")
+                .clearAndSetSemantics { contentDescription = text },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(Modifier.size(7.dp).clip(CircleShape).background(tint))
+            Text(text, color = colors.label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+private fun Header(initials: String, search: SearchUi.Open?, actions: HomeActions, onCloseSearch: () -> Unit) {
     val colors = HermexTheme.colors
     Row(
         Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 28.dp, bottom = 16.dp).heightIn(min = 52.dp),
@@ -531,12 +570,10 @@ private fun Header(initials: String, search: SearchUi.Open?, actions: HomeAction
                     },
                 )
                 Box(
-                    Modifier.size(44.dp).clip(CircleShape).clickable {
-                        if (search.query.isNotEmpty()) actions.onQuery("") else actions.onCloseSearch()
-                    }.testTag("search.clear"),
+                    Modifier.size(44.dp).clip(CircleShape).clickable(onClick = onCloseSearch).testTag("search.clear"),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Filled.Close, contentDescription = if (search.query.isNotEmpty()) "Clear search" else "Close search", tint = colors.secondaryLabel, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Filled.Close, contentDescription = "Close search", tint = colors.secondaryLabel, modifier = Modifier.size(20.dp))
                 }
             } else {
                 Box(

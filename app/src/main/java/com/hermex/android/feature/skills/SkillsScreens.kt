@@ -62,6 +62,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.TextStyle
@@ -304,10 +305,10 @@ internal fun SkillDetailScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text("Enabled", color = colors.label, fontSize = 16.sp)
+                        Text(if (enabled) "Enabled" else "Disabled", color = colors.label, fontSize = 16.sp, modifier = Modifier.testTag("skill.state"))
                         Text(
-                            if (enabled) "The agent can load this skill." else "Disabled",
-                            color = colors.secondaryLabel, fontSize = 13.sp, modifier = Modifier.testTag("skill.state"),
+                            if (enabled) "The agent can load this skill." else "The agent will not load this skill.",
+                            color = colors.secondaryLabel, fontSize = 13.sp, modifier = Modifier.testTag("skill.state.detail"),
                         )
                     }
                     Switch(
@@ -315,7 +316,7 @@ internal fun SkillDetailScreen(
                         onCheckedChange = onToggle,
                         enabled = !toggling,
                         colors = SwitchDefaults.colors(checkedTrackColor = colors.success, checkedThumbColor = Color.White),
-                        modifier = Modifier.testTag("skill.toggle"),
+                        modifier = Modifier.semantics { contentDescription = if (enabled) "Disable" else "Enable" }.testTag("skill.toggle"),
                     )
                 }
             }

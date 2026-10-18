@@ -61,10 +61,15 @@ internal sealed interface UsageUiState {
 
 internal data class UsageScreenState(
     val days: Int = 30,
-    val metric: UsageMetric = UsageMetric.Cost,
+    val chosenMetric: UsageMetric? = null,
     val content: UsageUiState = UsageUiState.Loading,
     val refreshing: Boolean = false,
-)
+) {
+    val metric: UsageMetric
+        get() = chosenMetric ?: (content as? UsageUiState.Success)?.view?.let { view ->
+            UsageMetric.entries.firstOrNull { metric -> view.buckets.any { it.total(metric) > 0 } }
+        } ?: UsageMetric.Cost
+}
 
 internal class UsageViewModel(private val repo: UsageRepository, private val profile: String) : ViewModel() {
     private val _state = MutableStateFlow(UsageScreenState())
@@ -81,7 +86,7 @@ internal class UsageViewModel(private val repo: UsageRepository, private val pro
         load()
     }
 
-    fun selectMetric(metric: UsageMetric) = _state.update { it.copy(metric = metric) }
+    fun selectMetric(metric: UsageMetric) = _state.update { it.copy(chosenMetric = metric) }
 
     fun load() {
         val days = _state.value.days
@@ -106,11 +111,14 @@ internal class UsageViewModel(private val repo: UsageRepository, private val pro
     }
 
     private fun buckets(daily: List<UsageDay>, days: Int): List<UsageBucket> {
-        val byDay = daily.associateBy { runCatching { LocalDate.parse(it.day.take(10)) }.getOrNull() }
-        val today = LocalDate.now()
+        val byDay = daily.mapNotNull { day -> runCatching { LocalDate.parse(day.day.take(10)) }.getOrNull()?.let { it to day } }.toMap()
+        // Server days are its own wall-clock dates, so the window ends on whichever is later: the
+        // device's today or the server's newest day. Anchoring on the device alone drops days when
+        // the host's calendar runs ahead.
+        val end = maxOf(LocalDate.now(), byDay.keys.maxOrNull() ?: LocalDate.MIN)
+        val start = minOf(end.minusDays(days - 1L), byDay.keys.minOrNull() ?: LocalDate.MAX)
         val label = DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
-        return (days - 1 downTo 0).map { offset ->
-            val date = today.minusDays(offset.toLong())
+        return generateSequence(start) { it.plusDays(1) }.takeWhile { !it.isAfter(end) }.toList().map { date ->
             val day = byDay[date]
             UsageBucket(
                 date = date,

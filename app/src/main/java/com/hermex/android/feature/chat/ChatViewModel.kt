@@ -16,12 +16,15 @@ import com.hermex.android.core.model.StoredKey
 import com.hermex.android.core.model.TranscriptItem
 import com.hermex.android.core.network.GatewayEnvelope
 import com.hermex.android.core.network.GatewayEvent
+import com.hermex.android.core.model.ConnectionState
 import com.hermex.android.core.network.GatewayStatus
 import com.hermex.android.core.network.HermesFailure
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -50,6 +53,7 @@ sealed interface ChatUiState {
         val refreshing: Boolean = false,
         val forking: Boolean = false,
         val openFork: ForkTarget? = null,
+        val connection: ConnectionState = ConnectionState.Online,
     ) : ChatUiState
 }
 
@@ -65,7 +69,9 @@ class ChatViewModel(
     private val initialCwd: String? = savedState.get<String>("cwd")
 
     private val _state = MutableStateFlow<ChatUiState>(ChatUiState.Loading)
-    val state: StateFlow<ChatUiState> = _state.asStateFlow()
+    val state: StateFlow<ChatUiState> = combine(_state, repository.connection) { state, connection ->
+        if (state is ChatUiState.Ready) state.copy(connection = connection) else state
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, _state.value)
 
     private var runtime: RuntimeId? = null
     private var lastSeq = 0L

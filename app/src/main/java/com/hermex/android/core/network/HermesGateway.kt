@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -58,6 +59,7 @@ class HermesGateway(
     private var generation = 0
     private val ids = AtomicLong(1)
     private val pending = ConcurrentHashMap<Long, CompletableDeferred<JsonElement>>()
+    private val wake = Channel<Unit>(Channel.CONFLATED)
 
     @Synchronized
     fun start() {
@@ -76,7 +78,8 @@ class HermesGateway(
     }
 
     fun reconnectNow() {
-        socket?.cancel()
+        val open = socket
+        if (open != null) open.cancel() else wake.trySend(Unit)
     }
 
     suspend fun call(method: String, params: JsonObject, timeoutMs: Long = CALL_TIMEOUT_MS): JsonElement {
@@ -129,7 +132,7 @@ class HermesGateway(
             failPending(HermesFailure.Transport("gateway", null))
             attempt += 1
             _status.value = GatewayStatus.Reconnecting(attempt, outcome)
-            delay(BACKOFF_SECONDS[(attempt - 1).coerceAtMost(BACKOFF_SECONDS.lastIndex)] * 1000L)
+            withTimeoutOrNull(BACKOFF_SECONDS[(attempt - 1).coerceAtMost(BACKOFF_SECONDS.lastIndex)] * 1000L) { wake.receive() }
         }
     }
 

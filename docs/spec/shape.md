@@ -126,3 +126,9 @@ Platform deviations:
 Stubbed in phase 1: Search and every sidebar destination (placeholder route), attachments (+), voice (mic), workspace folder button, slash commands, clarify/credential cards are minimal, tool rows do not group ("Show previous N"), transcript is not cached in Room (only the session list is), browser (PKCE) sign-in.
 
 Verification gaps: the < 0.21.3 refusal, silent re-sign-in on 401 and gateway reconnect were not driven on the device (the pinned host is 0.21.5 and must not be restarted). agent-device's accessibility tree lags several seconds after Compose navigation and while the run-status timer ticks; `wait` on a selector can time out even when `press` on the same selector succeeds.
+
+## Polish notes
+
+- Fork From Here drops tool rows because the 0.21.5 host's `session.branch` copies only plain user/assistant text. Checked over REST: parent `20261017_230314_7fec69` has `assistant{tool_calls}`, `tool{tool_name:"terminal"}`, `assistant` for the first turn; its fork `20261018_012745_8b9dbd` has the two assistant rows with no `tool_calls` and no `tool` row. The app renders whatever `GET /api/sessions/{id}/messages` returns, so nothing changes on the client. Left as a host limitation.
+- Kanban comments use "No comments yet" for an empty list; iOS shows "No Content" there. "No Content" stays for an empty description.
+- Insights follows the data until the user picks a metric: Cost when the window has cost, else Tokens, else Sessions (iOS: Cost else Tokens; Android also has Sessions). The daily window ends on the later of the device's today and the server's newest day string.

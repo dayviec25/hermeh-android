@@ -178,7 +178,7 @@ private fun DetailList(state: CardDetailUiState.Ready, onCommentChange: (String)
         item(key = "comments", contentType = "section") {
             SectionCard(countLabel(detail.comments.size, "Comment")) {
                 if (detail.comments.isEmpty()) {
-                    Text("No Content", color = colors.secondaryLabel, fontSize = 15.sp)
+                    Text("No comments yet", color = colors.secondaryLabel, fontSize = 15.sp, modifier = Modifier.testTag("card.comments.empty"))
                 }
                 detail.comments.forEach { comment ->
                     Column(Modifier.fillMaxWidth().testTag("card.comment.${comment.id}"), verticalArrangement = Arrangement.spacedBy(2.dp)) {
