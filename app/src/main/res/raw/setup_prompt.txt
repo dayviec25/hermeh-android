@@ -1,0 +1,24 @@
+Set up the Hermes dashboard on this machine for access from my Android phone.
+
+Inventory before changing anything:
+- Find the running `hermes dashboard` process, its `--host` and `--port` (default 9119), its launcher or service, and its `config.yaml`. Reuse and preserve working state instead of reinstalling it.
+- Check who owns the dashboard port with `lsof -nP -iTCP:9119 -sTCP:LISTEN` (or the OS equivalent, with the actual port). Do not kill an unknown process; stop and report the owner or conflict.
+- Look for an existing HTTPS route to the dashboard: a Cloudflare Tunnel, Tailscale Serve, or a reverse proxy. Preserve every existing route; do not reset, remove, or overwrite one.
+
+Require sign-in:
+- Never run the dashboard without its sign-in gate, and never bypass or disable it.
+- Keep an existing `dashboard.basic_auth.username` and password. Otherwise set `dashboard.basic_auth.username` and a `password_hash` for a secure random password, hashed with the dashboard's own Python from the hermes-agent checkout: `python -c "from plugins.dashboard_auth.basic import hash_password; print(hash_password('<password>'))"`. Do not store a plaintext `password`.
+- Keep an existing `dashboard.basic_auth.secret`. Otherwise set it to a random value of at least 32 bytes (for example `openssl rand -base64 32`) so sign-ins survive a restart.
+- Edit only these keys and `dashboard.public_url` in `config.yaml`, and preserve every other line. Do not print `config.yaml` or the secret.
+
+Choose the address my Android phone will use:
+- Prefer HTTPS: an existing Cloudflare Tunnel or private network (such as Tailscale) route to the dashboard, with the dashboard still bound to `127.0.0.1`. If none exists, propose the exact steps to add one and wait for me to approve them.
+- Treat same Wi-Fi over plain HTTP as an explicit manual fallback only. Explain that the password then crosses the network unencrypted, and require my confirmation before binding beyond loopback.
+- Set `dashboard.public_url` to the exact address my Android phone will use, scheme and host (for example `https://hermes.example.com`). Without it the dashboard rejects the phone with `400 Invalid Host header`.
+- Restart only the dashboard, through its existing launcher or service, and tell me before you do. Do not configure auto-start yourself; propose the exact OS-appropriate commands and wait for me to run them.
+
+Verify in this order:
+1. Confirm the dashboard locally with `curl --fail http://127.0.0.1:9119/api/status` (use the actual port).
+2. Confirm the phone's address with `curl --fail <exact-phone-address>/api/status`, keeping its scheme and port (`https://` unless I confirmed the same Wi-Fi fallback), and check that it reports `"auth_required": true` with `basic` in `auth_providers`.
+
+Reply with the exact address, username, password, and both check results, plus any remaining action required on my Android phone. Do not include `config.yaml` or the secret.
