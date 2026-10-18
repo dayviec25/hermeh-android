@@ -15,6 +15,10 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.hermex.android.AppGraph
 import com.hermex.android.core.data.AppearancePrefs
+import com.hermex.android.core.data.MemoryRepository
+import com.hermex.android.core.data.SkillsRepository
+import com.hermex.android.core.data.TasksRepository
+import com.hermex.android.core.data.UsageRepository
 import com.hermex.android.core.data.LogoColor
 import com.hermex.android.core.data.ThemeMode
 import com.hermex.android.core.data.BotsRepository
@@ -31,8 +35,12 @@ import com.hermex.android.feature.files.FileViewerViewModel
 import com.hermex.android.feature.files.FolderRoute
 import com.hermex.android.feature.files.FolderViewModel
 import com.hermex.android.feature.chat.ChatViewModel
-import com.hermex.android.feature.home.HomeRoute
+import com.hermex.android.feature.memory.MemoryRoute
+import com.hermex.android.feature.skills.SkillsRoute
+import com.hermex.android.feature.tasks.TasksRoute
+import com.hermex.android.feature.usage.UsageRoute
 import com.hermex.android.feature.home.HomeDestination
+import com.hermex.android.feature.home.HomeRoute
 import com.hermex.android.feature.home.HomeViewModel
 import com.hermex.android.feature.kanban.CardDetailViewModel
 import com.hermex.android.feature.kanban.KanbanRoute
@@ -58,6 +66,14 @@ import kotlinx.serialization.Serializable
 @Serializable data object KanbanRouteKey
 
 @Serializable data object BotsRouteKey
+
+@Serializable data object TasksRouteKey
+
+@Serializable data object SkillsRouteKey
+
+@Serializable data object MemoryRouteKey
+
+@Serializable data object UsageRouteKey
 
 @Composable
 fun HermexNavHost(graph: AppGraph, auth: AuthState.SignedIn) {
@@ -89,6 +105,10 @@ fun HermexNavHost(graph: AppGraph, auth: AuthState.SignedIn) {
                     when (it) {
                         HomeDestination.Kanban -> nav.navigate(KanbanRouteKey)
                         HomeDestination.Bots -> nav.navigate(BotsRouteKey)
+                        HomeDestination.Tasks -> nav.navigate(TasksRouteKey)
+                        HomeDestination.Skills -> nav.navigate(SkillsRouteKey)
+                        HomeDestination.Memory -> nav.navigate(MemoryRouteKey)
+                        HomeDestination.Insights -> nav.navigate(UsageRouteKey)
                         else -> nav.navigate(PlaceholderRouteKey(it.title))
                     }
                 },
@@ -189,6 +209,18 @@ fun HermexNavHost(graph: AppGraph, auth: AuthState.SignedIn) {
                 onBack = { nav.popBackStack() },
                 onOpenChat = { target -> nav.navigate(ChatRouteKey(target.key.value, target.profile.value, target.title)) },
             )
+        }
+        composable<TasksRouteKey> {
+            TasksRoute(remember { TasksRepository(graph.auth, graph.chat) }, profile, onBack = { nav.popBackStack() })
+        }
+        composable<SkillsRouteKey> {
+            SkillsRoute(remember { SkillsRepository(graph.auth) }, profile, onBack = { nav.popBackStack() })
+        }
+        composable<MemoryRouteKey> {
+            MemoryRoute(remember { MemoryRepository(graph.auth) }, profile, onBack = { nav.popBackStack() })
+        }
+        composable<UsageRouteKey> {
+            UsageRoute(remember { UsageRepository(graph.auth) }, profile, onBack = { nav.popBackStack() })
         }
         composable<PlaceholderRouteKey> { entry ->
             PlaceholderScreen(title = entry.toRoute<PlaceholderRouteKey>().title, onBack = { nav.popBackStack() })
