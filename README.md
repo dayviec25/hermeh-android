@@ -78,3 +78,7 @@ Every stub turn says "Let me run a quick check.", runs a `terminal` call that wa
 ## Credits
 
 Original design, protocol and product by [Hermex](https://github.com/uzairansaruzi/hermex) (MIT). The file-type icons are Pierre's `@pierre/trees` icons (Apache-2.0), plus six from T3 Code (MIT). This is an independent port and isn't affiliated with the Hermex or Hermes projects. Hermeh installs as `com.hermeh.android`, separate from Hermex 0.1.0 builds (`com.hermex.android`).
+
+## License
+
+MIT. See [LICENSE](LICENSE). Third-party assets keep their own licenses, listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
