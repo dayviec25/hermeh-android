@@ -51,7 +51,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable data object HomeRouteKey
 
-@Serializable data class ChatRouteKey(val key: String? = null, val profile: String, val title: String? = null, val cwd: String? = null)
+@Serializable data class ChatRouteKey(val key: String? = null, val profile: String, val title: String? = null, val cwd: String? = null, val focus: Boolean = false)
 
 @Serializable data object SettingsRouteKey
 
@@ -102,7 +102,7 @@ fun HermehNavHost(graph: AppGraph, auth: AuthState.SignedIn) {
                 viewModel = viewModel,
                 initials = initials(auth.user.displayName.ifBlank { auth.server.username }),
                 onOpenSession = { row -> nav.navigate(ChatRouteKey(row.key, row.profile, row.title, row.cwd)) },
-                onNewChat = { nav.navigate(ChatRouteKey(null, profile, null)) },
+                onNewChat = { nav.navigate(ChatRouteKey(null, profile, null, focus = true)) },
                 onDestination = {
                     when (it) {
                         HomeDestination.Kanban -> nav.navigate(KanbanRouteKey)
@@ -128,12 +128,13 @@ fun HermehNavHost(graph: AppGraph, auth: AuthState.SignedIn) {
                         handle["profile"] = route.profile
                         handle["title"] = route.title
                         handle["cwd"] = route.cwd
-                        ChatViewModel(handle, graph.chat, graph::notifySessionsChanged)
+                        ChatViewModel(handle, graph.chat, graph.store.companion, graph::notifySessionsChanged)
                     }
                 },
             )
             ChatRoute(
                 viewModel = viewModel,
+                focusComposer = route.focus,
                 onBack = { nav.popBackStack() },
                 onOpenFiles = { cwd -> nav.navigate(FilesRouteKey(cwd, cwd)) },
                 onOpenFork = { fork -> nav.navigate(ChatRouteKey(fork.key, fork.profile, fork.title)) },

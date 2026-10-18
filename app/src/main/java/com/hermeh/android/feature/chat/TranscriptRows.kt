@@ -53,6 +53,8 @@ import android.content.ClipData
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -61,7 +63,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hermeh.android.R
+import com.hermeh.android.core.designsystem.HermehShapes
 import com.hermeh.android.core.designsystem.HermehTheme
+import com.hermeh.android.core.designsystem.HermehType
+import com.hermeh.android.core.designsystem.Mascot
+import com.hermeh.android.core.model.Companion
+import com.hermeh.android.core.model.MascotCatalog
+import com.hermeh.android.core.model.MascotMood
 import com.hermeh.android.core.model.NoticeKind
 import com.hermeh.android.core.model.ToolStatus
 import com.hermeh.android.core.model.TranscriptItem
@@ -76,19 +84,42 @@ import com.mikepenz.markdown.m3.markdownTypography
 fun UserBubble(item: TranscriptItem.User, modifier: Modifier = Modifier) {
     val colors = HermehTheme.colors
     BoxWithConstraints(modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-        val shape = RoundedCornerShape(20.dp)
+        val shape = HermehShapes.userBubble
         Text(
             item.text,
             color = colors.label,
-            fontSize = 15.sp,
-            lineHeight = 21.sp,
+            fontSize = 16.sp,
+            lineHeight = 22.sp,
             modifier = Modifier
                 .widthIn(max = maxWidth * 0.8f)
                 .clip(shape)
                 .background(colors.userBubble)
                 .border(1.dp, colors.userBubbleStroke, shape)
-                .padding(horizontal = 14.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = 10.dp),
         )
+    }
+}
+
+@Composable
+fun TurnHeader(companion: Companion, modifier: Modifier = Modifier) {
+    val colors = HermehTheme.colors
+    Row(
+        modifier
+            .padding(top = 6.dp)
+            .semantics(mergeDescendants = true) {}
+            .testTag("chat.turnHeader"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Mascot(
+            MascotCatalog.find(companion.mascot),
+            colors.mascot,
+            MascotMood.Idle,
+            22.dp,
+            Modifier.clearAndSetSemantics { },
+            animated = false,
+        )
+        Text(companion.name, color = colors.label, style = HermehType.nameTag, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

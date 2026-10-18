@@ -8,6 +8,8 @@ import com.hermeh.android.core.data.ChatRepository
 import com.hermeh.android.core.data.ModelCatalog
 import com.hermeh.android.core.data.ModelOption
 import com.hermeh.android.core.model.ApprovalChoice
+import com.hermeh.android.core.model.Companion
+import com.hermeh.android.core.model.DefaultCompanion
 import com.hermeh.android.core.model.PendingRequest
 import com.hermeh.android.core.model.ProfileName
 import com.hermeh.android.core.model.RunState
@@ -20,6 +22,7 @@ import com.hermeh.android.core.model.ConnectionState
 import com.hermeh.android.core.network.GatewayStatus
 import com.hermeh.android.core.network.HermesFailure
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -60,8 +63,11 @@ sealed interface ChatUiState {
 class ChatViewModel(
     savedState: SavedStateHandle,
     private val repository: ChatRepository,
+    companion: Flow<Companion>,
     private val onSessionsChanged: () -> Unit,
 ) : ViewModel() {
+
+    val companion: StateFlow<Companion> = companion.stateIn(viewModelScope, SharingStarted.Eagerly, DefaultCompanion)
 
     private val profile = ProfileName(savedState.get<String>("profile") ?: "default")
     private var storedKey: StoredKey? = savedState.get<String>("key")?.takeIf { it.isNotEmpty() }?.let(::StoredKey)

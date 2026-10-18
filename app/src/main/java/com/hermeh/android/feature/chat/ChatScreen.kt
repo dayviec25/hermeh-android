@@ -19,6 +19,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -74,6 +75,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.platform.testTag
@@ -89,7 +99,13 @@ import com.hermeh.android.R
 import com.hermeh.android.core.data.ModelOption
 import com.hermeh.android.core.designsystem.GlassCircleButton
 import com.hermeh.android.core.designsystem.AutomationAccessibilityRefresh
+import com.hermeh.android.core.designsystem.HermehShapes
 import com.hermeh.android.core.designsystem.HermehTheme
+import com.hermeh.android.core.designsystem.HermehType
+import com.hermeh.android.core.designsystem.Mascot
+import com.hermeh.android.core.model.Companion
+import com.hermeh.android.core.model.MascotCatalog
+import com.hermeh.android.core.model.MascotMood
 import com.hermeh.android.core.designsystem.glassSurface
 import com.hermeh.android.core.model.ApprovalChoice
 import com.hermeh.android.core.model.PendingRequest
@@ -111,11 +127,13 @@ fun reasoningLabel(level: String?): String = when (level) {
 @Composable
 fun ChatRoute(
     viewModel: ChatViewModel,
+    focusComposer: Boolean,
     onBack: () -> Unit,
     onOpenFiles: (String) -> Unit,
     onOpenFork: (ForkTarget) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val companion by viewModel.companion.collectAsStateWithLifecycle()
     AutomationAccessibilityRefresh()
     val fork = (state as? ChatUiState.Ready)?.openFork
     LaunchedEffect(fork) {
@@ -126,6 +144,8 @@ fun ChatRoute(
     }
     ChatScreen(
         state = state,
+        companion = companion,
+        focusComposer = focusComposer,
         onBack = onBack,
         onOpenFiles = onOpenFiles,
         onFork = viewModel::fork,
@@ -146,6 +166,8 @@ fun ChatRoute(
 @Composable
 fun ChatScreen(
     state: ChatUiState,
+    companion: Companion,
+    focusComposer: Boolean,
     onBack: () -> Unit,
     onOpenFiles: (String) -> Unit,
     onFork: (TranscriptItem) -> Unit,
@@ -174,7 +196,9 @@ fun ChatScreen(
         val cwd = ready?.chat?.cwd
         ChatHeader(
             title = ready?.chat?.title?.takeIf { it.isNotBlank() } ?: "New chat",
-            subtitle = ready?.profile?.value ?: "",
+            subtitle = ready?.profile?.value?.let { "${companion.name} · $it" } ?: companion.name,
+            companion = companion,
+            mood = ready?.let { headerMood(it.chat.run, it.chat.pending.isNotEmpty(), it.connection) } ?: MascotMood.Idle,
             onBack = onBack,
             onFiles = cwd?.let { path -> { onOpenFiles(path) } },
         )
@@ -192,14 +216,18 @@ fun ChatScreen(
             }
             is ChatUiState.Ready -> {
                 if (state.savedCopy) SavedCopyNote(onRetry)
-                Transcript(state.chat.items, onFork, Modifier.weight(1f))
+                if (state.chat.items.isEmpty() && !state.refreshing) {
+                    EmptyChat(companion, onStarter = onInput, modifier = Modifier.weight(1f))
+                } else {
+                    Transcript(state.chat.items, companion, onFork, Modifier.weight(1f))
+                }
                 if (state.forking) ForkingNote()
                 state.banner?.let { Banner(it, onDismissBanner) }
                 state.chat.pending.forEach { request ->
                     when (request) {
                         is PendingRequest.Approval -> ApprovalCard(request, answering = request.envelopeId in state.answering, onChoice = { onApproval(request, it) })
                         is PendingRequest.Clarify -> TextRequestCard(
-                            title = "Hermes has a question",
+                            title = "${companion.name} has a question",
                             prompt = request.question,
                             options = request.options,
                             secure = false,
@@ -216,9 +244,11 @@ fun ChatScreen(
                         )
                     }
                 }
-                RunStatusCapsule(state.chat.run, state.connection)
+                RunStatusCapsule(state.chat.run, state.connection, companion)
                 Composer(
                     state = state,
+                    companionName = companion.name,
+                    focusOnOpen = focusComposer,
                     onInput = onInput,
                     onSend = onSend,
                     onStop = onStop,
@@ -232,14 +262,31 @@ fun ChatScreen(
 }
 
 @Composable
-private fun ChatHeader(title: String, subtitle: String, onBack: () -> Unit, onFiles: (() -> Unit)?) {
+private fun ChatHeader(
+    title: String,
+    subtitle: String,
+    companion: Companion,
+    mood: MascotMood,
+    onBack: () -> Unit,
+    onFiles: (() -> Unit)?,
+) {
     val colors = HermehTheme.colors
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         GlassCircleButton(Icons.AutoMirrored.Filled.ArrowBack, "Back", onBack, Modifier.testTag("chat.back"))
-        Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
+        Spacer(Modifier.size(12.dp))
+        Mascot(
+            MascotCatalog.find(companion.mascot),
+            colors.mascot,
+            mood,
+            28.dp,
+            Modifier.testTag("chat.mascot"),
+            name = companion.name,
+            animated = false,
+        )
+        Column(Modifier.weight(1f).padding(start = 10.dp, end = 14.dp)) {
             Text(
                 title,
                 color = colors.label,
@@ -249,7 +296,9 @@ private fun ChatHeader(title: String, subtitle: String, onBack: () -> Unit, onFi
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.testTag("chat.title"),
             )
-            if (subtitle.isNotEmpty()) Text(subtitle, color = colors.secondaryLabel, fontSize = 12.sp, maxLines = 1)
+            if (subtitle.isNotEmpty()) {
+                Text(subtitle, color = colors.secondaryLabel, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("chat.subtitle"))
+            }
         }
         GlassCircleButton(
             painterResource(R.drawable.ic_lucide_folder),
@@ -270,6 +319,10 @@ private sealed interface TranscriptRow {
     data class ToolToggle(val groupId: String, val hidden: Int, val expanded: Boolean) : TranscriptRow {
         override val key: String get() = "toggle-$groupId"
     }
+
+    data class TurnHeader(val firstId: String) : TranscriptRow {
+        override val key: String get() = "turn-$firstId"
+    }
 }
 
 private fun transcriptRows(items: List<TranscriptItem>, expanded: Set<String>): List<TranscriptRow> {
@@ -277,6 +330,8 @@ private fun transcriptRows(items: List<TranscriptItem>, expanded: Set<String>): 
     var index = 0
     while (index < items.size) {
         val item = items[index]
+        val previous = items.getOrNull(index - 1)
+        if (item !is TranscriptItem.User && (previous == null || previous is TranscriptItem.User)) rows += TranscriptRow.TurnHeader(item.id)
         if (item !is TranscriptItem.Tool) {
             rows += TranscriptRow.Entry(item)
             index += 1
@@ -299,7 +354,7 @@ private fun transcriptRows(items: List<TranscriptItem>, expanded: Set<String>): 
 }
 
 @Composable
-private fun Transcript(items: List<TranscriptItem>, onFork: (TranscriptItem) -> Unit, modifier: Modifier) {
+private fun Transcript(items: List<TranscriptItem>, companion: Companion, onFork: (TranscriptItem) -> Unit, modifier: Modifier) {
     val listState = rememberLazyListState()
     var expanded by rememberSaveable { mutableStateOf(emptySet<String>()) }
     val rows = remember(items, expanded) { transcriptRows(items, expanded).asReversed() }
@@ -317,9 +372,11 @@ private fun Transcript(items: List<TranscriptItem>, onFork: (TranscriptItem) -> 
             when (row) {
                 is TranscriptRow.Entry -> row.item::class.simpleName
                 is TranscriptRow.ToolToggle -> "toggle"
+                is TranscriptRow.TurnHeader -> "turnHeader"
             }
         }) { row ->
             when (row) {
+                is TranscriptRow.TurnHeader -> TurnHeader(companion)
                 is TranscriptRow.ToolToggle -> ToolGroupToggle(row) {
                     expanded = if (row.expanded) expanded - row.groupId else expanded + row.groupId
                 }
@@ -569,22 +626,23 @@ private fun TextRequestCard(
 }
 
 @Composable
-private fun RunStatusCapsule(run: RunState, connection: ConnectionState) {
+private fun RunStatusCapsule(run: RunState, connection: ConnectionState, companion: Companion) {
     val colors = HermehTheme.colors
-    val (caption, since, tint) = when (connection) {
-        ConnectionState.WaitingForNetwork -> Triple(CAPTION_WAITING_NETWORK, null, colors.secondaryLabel)
-        ConnectionState.Reconnecting -> Triple(CAPTION_RECONNECTING, null, colors.secondaryLabel)
-        is ConnectionState.Failed -> Triple(CAPTION_DISCONNECTED, null, colors.danger)
+    val working = "${companion.name} is working"
+    val (caption, since, mood) = when (connection) {
+        ConnectionState.WaitingForNetwork -> Triple(CAPTION_WAITING_NETWORK, null, MascotMood.Offline)
+        ConnectionState.Reconnecting -> Triple(CAPTION_RECONNECTING, null, MascotMood.Offline)
+        is ConnectionState.Failed -> Triple(CAPTION_DISCONNECTED, null, MascotMood.Offline)
         ConnectionState.Online -> when (run) {
             RunState.Idle -> return
-            is RunState.Working -> Triple(run.caption, run.since, colors.working)
-            RunState.WaitingForYou -> Triple(CAPTION_WAITING, null, colors.approval)
-            RunState.Stopping -> Triple(CAPTION_STOPPING, null, colors.danger)
-            RunState.Reconnecting -> Triple(CAPTION_RECONNECTING, null, colors.secondaryLabel)
+            is RunState.Working -> Triple(if (run.caption == CAPTION_WORKING) working else run.caption, run.since, MascotMood.Working)
+            RunState.WaitingForYou -> Triple(CAPTION_WAITING, null, MascotMood.WaitingForYou)
+            RunState.Stopping -> Triple(CAPTION_STOPPING, null, MascotMood.Working)
+            RunState.Reconnecting -> Triple(CAPTION_RECONNECTING, null, MascotMood.Offline)
         }
     }
     val offline = connection != ConnectionState.Online
-    val spoken = if (!offline && run is RunState.Working) CAPTION_WORKING else caption
+    val spoken = if (!offline && run is RunState.Working) working else caption
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(run) {
         while (true) {
@@ -600,13 +658,13 @@ private fun RunStatusCapsule(run: RunState, connection: ConnectionState) {
         Row(
             Modifier
                 .glassSurface(CircleShape)
-                .padding(horizontal = 11.dp, vertical = 7.dp)
+                .padding(start = 7.dp, end = 12.dp, top = 5.dp, bottom = 5.dp)
                 .testTag("chat.runStatus")
                 .clearAndSetSemantics { contentDescription = spoken },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(7.dp),
         ) {
-            Box(Modifier.size(7.dp).clip(CircleShape).background(tint))
+            Mascot(MascotCatalog.find(companion.mascot), colors.mascot, mood, 20.dp, name = companion.name, animated = false)
             if (!offline) Text(timer, color = colors.secondaryLabel, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace)
             Text(caption, color = colors.label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 240.dp))
         }
@@ -617,6 +675,8 @@ private fun RunStatusCapsule(run: RunState, connection: ConnectionState) {
 @Composable
 private fun Composer(
     state: ChatUiState.Ready,
+    companionName: String,
+    focusOnOpen: Boolean,
     onInput: (String) -> Unit,
     onSend: () -> Unit,
     onStop: () -> Unit,
@@ -627,6 +687,18 @@ private fun Composer(
     val running = state.chat.isRunning
     val canSend = state.input.isNotBlank()
     val focus = LocalFocusManager.current
+    val focusRequester = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    var focusedOnOpen by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (focusOnOpen && !focusedOnOpen) {
+            focusedOnOpen = true
+            focusRequester.requestFocus()
+            keyboard?.show()
+        }
+    }
+    var field by remember { mutableStateOf(TextFieldValue(state.input, TextRange(state.input.length))) }
+    if (field.text != state.input) field = TextFieldValue(state.input, TextRange(state.input.length))
     val submit = {
         focus.clearFocus()
         onSend()
@@ -642,19 +714,22 @@ private fun Composer(
         Column(
             Modifier
                 .fillMaxWidth()
-                .glassSurface(RoundedCornerShape(26.dp), elevated = true)
+                .glassSurface(HermehShapes.composer, elevated = true)
                 .padding(start = 18.dp, end = 10.dp, top = 14.dp, bottom = 10.dp),
         ) {
             BasicTextField(
-                value = state.input,
-                onValueChange = onInput,
+                value = field,
+                onValueChange = {
+                    field = it
+                    if (it.text != state.input) onInput(it.text)
+                },
                 textStyle = TextStyle(color = colors.label, fontSize = 16.sp, lineHeight = 22.sp),
                 cursorBrush = SolidColor(colors.label),
                 maxLines = 6,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 24.dp).padding(end = 8.dp).testTag("chat.input"),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 24.dp).padding(end = 8.dp).focusRequester(focusRequester).testTag("chat.input"),
                 decorationBox = { inner ->
                     Box {
-                        if (state.input.isEmpty()) Text("Ask anything… /commands", color = colors.tertiaryLabel, fontSize = 16.sp)
+                        if (state.input.isEmpty()) Text("Message $companionName…", color = colors.tertiaryLabel, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         inner()
                     }
                 },
@@ -708,7 +783,7 @@ private fun Composer(
                     }
                 } else {
                     val fill = when {
-                        canSend -> colors.label
+                        canSend -> colors.ink
                         colors.isDark -> colors.label.copy(alpha = 0.18f)
                         else -> colors.label.copy(alpha = 0.12f)
                     }
@@ -724,7 +799,7 @@ private fun Composer(
                         Icon(
                             Icons.Filled.ArrowUpward,
                             contentDescription = "Send",
-                            tint = if (canSend) colors.background else colors.secondaryLabel,
+                            tint = if (canSend) colors.onInk else colors.secondaryLabel,
                             modifier = Modifier.size(22.dp),
                         )
                     }
@@ -806,6 +881,72 @@ private fun ModelPickerSheet(
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+private val STARTERS = listOf("Check on my server", "Summarize my recent sessions", "Plan a scheduled task")
+
+private fun headerMood(run: RunState, pending: Boolean, connection: ConnectionState): MascotMood = when {
+    connection != ConnectionState.Online -> MascotMood.Offline
+    pending -> MascotMood.WaitingForYou
+    else -> when (run) {
+        RunState.Idle -> MascotMood.Idle
+        is RunState.Working -> MascotMood.Working
+        RunState.WaitingForYou -> MascotMood.WaitingForYou
+        RunState.Stopping, RunState.Reconnecting -> MascotMood.Working
+    }
+}
+
+@Composable
+private fun EmptyChat(companion: Companion, onStarter: (String) -> Unit, modifier: Modifier = Modifier) {
+    val colors = HermehTheme.colors
+    BoxWithConstraints(modifier.fillMaxWidth().testTag("chat.empty")) {
+        val width = maxWidth
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .heightIn(min = maxHeight)
+                .padding(vertical = 8.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Mascot(MascotCatalog.find(companion.mascot), colors.mascot, MascotMood.Idle, 120.dp, name = companion.name)
+            Spacer(Modifier.size(10.dp))
+            Text(
+                "What should we work on?",
+                color = colors.label,
+                style = HermehType.headline,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 24.dp),
+            )
+            Spacer(Modifier.size(16.dp))
+            Row(
+                Modifier
+                    .horizontalScroll(rememberScrollState())
+                    .widthIn(min = width)
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            ) {
+                STARTERS.forEachIndexed { index, prompt ->
+                    Text(
+                        prompt,
+                        color = colors.label,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .clip(HermehShapes.capsule)
+                            .background(colors.secondaryBackground)
+                            .border(1.dp, colors.separator, HermehShapes.capsule)
+                            .clickable { onStarter(prompt) }
+                            .heightIn(min = 44.dp)
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                            .testTag("chat.starter.$index"),
+                    )
                 }
             }
         }
