@@ -28,6 +28,7 @@ sealed interface GatewayEvent {
         val provider: String?,
         val reasoningEffort: String?,
         val profileName: String?,
+        val cwd: String? = null,
     ) : GatewayEvent
     data class SessionTitle(val storedKey: String?, val title: String) : GatewayEvent
     data class Error(val message: String) : GatewayEvent
@@ -83,6 +84,7 @@ object GatewayEventParser {
                 provider = payload.str("provider"),
                 reasoningEffort = payload.str("reasoning_effort"),
                 profileName = payload.str("profile_name"),
+                cwd = payload.str("cwd"),
             )
             "session.title" -> GatewayEvent.SessionTitle(payload.str("session_id"), payload.str("title").orEmpty())
             "error" -> GatewayEvent.Error(payload.str("message") ?: "Hermes reported an error.")

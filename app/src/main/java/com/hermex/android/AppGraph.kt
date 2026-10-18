@@ -7,6 +7,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.hermex.android.core.data.AppStore
 import com.hermex.android.core.data.AuthRepository
 import com.hermex.android.core.data.ChatRepository
+import com.hermex.android.core.data.FilesRepository
 import com.hermex.android.core.data.SecretCipher
 import com.hermex.android.core.data.SessionRepository
 import com.hermex.android.core.data.db.HermexDatabase
@@ -43,8 +44,11 @@ class AppGraph(context: Context) {
         auth.authorized { rest -> GatewayTarget(rest.gatewayUrl(), rest.wsTicket(), rest.headers) }
     }
 
-    val sessions by lazy { SessionRepository(auth, database.sessions()) }
-    val chat = ChatRepository(auth, gateway)
+    val chat by lazy { ChatRepository(auth, gateway, database.transcripts()) }
+    val sessions by lazy {
+        SessionRepository(auth, database.sessions(), gateway, { chat.attachedRuntimes }, { chat.forgetRuntime(it) })
+    }
+    val files = FilesRepository(auth)
 
     private val _sessionsChanged = MutableSharedFlow<Unit>(extraBufferCapacity = 8)
     val sessionsChanged: SharedFlow<Unit> = _sessionsChanged.asSharedFlow()
@@ -57,6 +61,7 @@ class AppGraph(context: Context) {
         gateway.stop()
         auth.signOut()
         sessions.clearAll()
+        database.transcripts().clearAll()
     }
 
     fun start() {

@@ -37,6 +37,9 @@ class AuthRepository(
     private val _profile = MutableStateFlow("default")
     val activeProfile: StateFlow<String> = _profile.asStateFlow()
 
+    private val _showAll = MutableStateFlow(false)
+    val showAllProfiles: StateFlow<Boolean> = _showAll.asStateFlow()
+
     private var rest: HermesRest? = null
     private val signInMutex = Mutex()
 
@@ -64,6 +67,8 @@ class AuthRepository(
             val version = runCatching { client.status().version }.getOrNull().orEmpty()
             AuthState.SignedIn(saved.config, user, version)
         } catch (failure: HermesFailure.Transport) {
+            store.profilePick()?.let { _profile.value = it }
+            _showAll.value = store.showAllProfiles()
             AuthState.SignedIn(saved.config, HermesUser(saved.config.username, saved.config.username, "basic"), "")
         } catch (failure: HermesFailure) {
             AuthState.SignedOut(saved.config, failure.message)
@@ -140,7 +145,19 @@ class AuthRepository(
         client.passwordLogin(server.username, password)
     }
 
+    suspend fun pickProfile(name: String, showAll: Boolean) {
+        _profile.value = name
+        _showAll.value = showAll
+        store.setProfilePick(name, showAll)
+    }
+
     private suspend fun refreshProfile(client: HermesRest) {
+        _showAll.value = store.showAllProfiles()
+        val picked = store.profilePick()
+        if (picked != null) {
+            _profile.value = picked
+            return
+        }
         runCatching { client.activeProfile() }.onSuccess { _profile.value = it }
     }
 

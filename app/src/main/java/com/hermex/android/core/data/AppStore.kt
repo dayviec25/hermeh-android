@@ -88,6 +88,8 @@ class AppStore(private val context: Context, private val cipher: SecretCipher) {
             it.remove(KEY_SERVER)
             it.remove(KEY_PASSWORD)
             it.remove(KEY_COOKIES)
+            it.remove(KEY_PROFILE_PICK)
+            it.remove(KEY_SHOW_ALL)
         }
     }
 
@@ -95,6 +97,17 @@ class AppStore(private val context: Context, private val cipher: SecretCipher) {
 
     suspend fun markOnboarded() {
         context.dataStore.edit { it[KEY_ONBOARDED] = "1" }
+    }
+
+    suspend fun profilePick(): String? = context.dataStore.data.first()[KEY_PROFILE_PICK]?.takeIf { it.isNotEmpty() }
+
+    suspend fun showAllProfiles(): Boolean = context.dataStore.data.first()[KEY_SHOW_ALL] == "1"
+
+    suspend fun setProfilePick(name: String, showAll: Boolean) {
+        context.dataStore.edit {
+            it[KEY_PROFILE_PICK] = name
+            it[KEY_SHOW_ALL] = if (showAll) "1" else "0"
+        }
     }
 
     suspend fun setTheme(mode: ThemeMode) {
@@ -128,5 +141,7 @@ class AppStore(private val context: Context, private val cipher: SecretCipher) {
         val KEY_THEME = stringPreferencesKey("theme")
         val KEY_LOGO = stringPreferencesKey("logo")
         val KEY_ONBOARDED = stringPreferencesKey("onboarded")
+        val KEY_PROFILE_PICK = stringPreferencesKey("profile.pick")
+        val KEY_SHOW_ALL = stringPreferencesKey("profile.showAll")
     }
 }

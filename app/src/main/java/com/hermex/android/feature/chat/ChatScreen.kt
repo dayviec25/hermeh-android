@@ -1,6 +1,20 @@
 package com.hermex.android.feature.chat
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material.icons.automirrored.filled.CallSplit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.WifiOff
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.runtime.rememberCoroutineScope
+import android.content.ClipData
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -74,6 +88,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hermex.android.R
 import com.hermex.android.core.data.ModelOption
 import com.hermex.android.core.designsystem.GlassCircleButton
+import com.hermex.android.core.designsystem.AutomationAccessibilityRefresh
 import com.hermex.android.core.designsystem.HermexTheme
 import com.hermex.android.core.designsystem.glassSurface
 import com.hermex.android.core.model.ApprovalChoice
@@ -93,11 +108,26 @@ fun reasoningLabel(level: String?): String = when (level) {
 }
 
 @Composable
-fun ChatRoute(viewModel: ChatViewModel, onBack: () -> Unit) {
+fun ChatRoute(
+    viewModel: ChatViewModel,
+    onBack: () -> Unit,
+    onOpenFiles: (String) -> Unit,
+    onOpenFork: (ForkTarget) -> Unit,
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    AutomationAccessibilityRefresh()
+    val fork = (state as? ChatUiState.Ready)?.openFork
+    LaunchedEffect(fork) {
+        if (fork != null) {
+            viewModel.consumeFork()
+            onOpenFork(fork)
+        }
+    }
     ChatScreen(
         state = state,
         onBack = onBack,
+        onOpenFiles = onOpenFiles,
+        onFork = viewModel::fork,
         onRetry = viewModel::retry,
         onInput = viewModel::onInputChange,
         onSend = viewModel::send,
@@ -116,6 +146,8 @@ fun ChatRoute(viewModel: ChatViewModel, onBack: () -> Unit) {
 fun ChatScreen(
     state: ChatUiState,
     onBack: () -> Unit,
+    onOpenFiles: (String) -> Unit,
+    onFork: (TranscriptItem) -> Unit,
     onRetry: () -> Unit,
     onInput: (String) -> Unit,
     onSend: () -> Unit,
@@ -138,10 +170,12 @@ fun ChatScreen(
             .imePadding(),
     ) {
         val ready = state as? ChatUiState.Ready
+        val cwd = ready?.chat?.cwd
         ChatHeader(
             title = ready?.chat?.title?.takeIf { it.isNotBlank() } ?: "New chat",
             subtitle = ready?.profile?.value ?: "",
             onBack = onBack,
+            onFiles = cwd?.let { path -> { onOpenFiles(path) } },
         )
         when (state) {
             ChatUiState.Loading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -156,7 +190,9 @@ fun ChatScreen(
                 TextButton(onClick = onRetry) { Text("Try again", color = colors.accent) }
             }
             is ChatUiState.Ready -> {
-                Transcript(state.chat.items, Modifier.weight(1f))
+                if (state.savedCopy) SavedCopyNote(onRetry)
+                Transcript(state.chat.items, onFork, Modifier.weight(1f))
+                if (state.forking) ForkingNote()
                 state.banner?.let { Banner(it, onDismissBanner) }
                 state.chat.pending.forEach { request ->
                     when (request) {
@@ -195,7 +231,7 @@ fun ChatScreen(
 }
 
 @Composable
-private fun ChatHeader(title: String, subtitle: String, onBack: () -> Unit) {
+private fun ChatHeader(title: String, subtitle: String, onBack: () -> Unit, onFiles: (() -> Unit)?) {
     val colors = HermexTheme.colors
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -214,13 +250,58 @@ private fun ChatHeader(title: String, subtitle: String, onBack: () -> Unit) {
             )
             if (subtitle.isNotEmpty()) Text(subtitle, color = colors.secondaryLabel, fontSize = 12.sp, maxLines = 1)
         }
-        GlassCircleButton(painterResource(R.drawable.ic_lucide_folder), "Workspace", {}, Modifier.testTag("chat.workspace"))
+        GlassCircleButton(
+            painterResource(R.drawable.ic_lucide_folder),
+            "Workspace files",
+            onClick = { onFiles?.invoke() },
+            modifier = Modifier.alpha(if (onFiles != null) 1f else 0.4f).testTag("chat.files"),
+        )
     }
 }
 
+private sealed interface TranscriptRow {
+    val key: String
+
+    data class Entry(val item: TranscriptItem) : TranscriptRow {
+        override val key: String get() = item.id
+    }
+
+    data class ToolToggle(val groupId: String, val hidden: Int, val expanded: Boolean) : TranscriptRow {
+        override val key: String get() = "toggle-$groupId"
+    }
+}
+
+private fun transcriptRows(items: List<TranscriptItem>, expanded: Set<String>): List<TranscriptRow> {
+    val rows = ArrayList<TranscriptRow>(items.size)
+    var index = 0
+    while (index < items.size) {
+        val item = items[index]
+        if (item !is TranscriptItem.Tool) {
+            rows += TranscriptRow.Entry(item)
+            index += 1
+            continue
+        }
+        var end = index
+        while (end + 1 < items.size && items[end + 1] is TranscriptItem.Tool) end += 1
+        val run = items.subList(index, end + 1)
+        if (run.size >= 2) {
+            val groupId = run.first().id
+            val open = groupId in expanded
+            rows += TranscriptRow.ToolToggle(groupId, run.size - 1, open)
+            if (open) run.forEach { rows += TranscriptRow.Entry(it) } else rows += TranscriptRow.Entry(run.last())
+        } else {
+            rows += TranscriptRow.Entry(item)
+        }
+        index = end + 1
+    }
+    return rows
+}
+
 @Composable
-private fun Transcript(items: List<TranscriptItem>, modifier: Modifier) {
+private fun Transcript(items: List<TranscriptItem>, onFork: (TranscriptItem) -> Unit, modifier: Modifier) {
     val listState = rememberLazyListState()
+    var expanded by rememberSaveable { mutableStateOf(emptySet<String>()) }
+    val rows = remember(items, expanded) { transcriptRows(items, expanded).asReversed() }
     LaunchedEffect(items.size) {
         if (listState.firstVisibleItemIndex <= 1) listState.scrollToItem(0)
     }
@@ -231,15 +312,124 @@ private fun Transcript(items: List<TranscriptItem>, modifier: Modifier) {
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.Bottom),
     ) {
-        items(items.asReversed(), key = { it.id }, contentType = { it::class.simpleName }) { item ->
-            when (item) {
-                is TranscriptItem.User -> UserBubble(item)
-                is TranscriptItem.Assistant -> AssistantText(item, Modifier.testTag("chat.assistant"))
-                is TranscriptItem.Thinking -> ThinkingRow(item)
-                is TranscriptItem.Tool -> ToolRow(item)
-                is TranscriptItem.Notice -> NoticeRow(item)
+        items(rows, key = { it.key }, contentType = { row ->
+            when (row) {
+                is TranscriptRow.Entry -> row.item::class.simpleName
+                is TranscriptRow.ToolToggle -> "toggle"
+            }
+        }) { row ->
+            when (row) {
+                is TranscriptRow.ToolToggle -> ToolGroupToggle(row) {
+                    expanded = if (row.expanded) expanded - row.groupId else expanded + row.groupId
+                }
+                is TranscriptRow.Entry -> when (val item = row.item) {
+                    is TranscriptItem.User -> MessageMenuHost(item, item.text, onFork) { UserBubble(item) }
+                    is TranscriptItem.Assistant -> MessageMenuHost(item, item.markdown, onFork) { AssistantText(item, Modifier.testTag("chat.assistant")) }
+                    is TranscriptItem.Thinking -> ThinkingRow(item)
+                    is TranscriptItem.Tool -> ToolRow(item)
+                    is TranscriptItem.Notice -> NoticeRow(item)
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun ToolGroupToggle(row: TranscriptRow.ToolToggle, onToggle: () -> Unit) {
+    val colors = HermexTheme.colors
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onToggle)
+            .heightIn(min = 36.dp)
+            .padding(horizontal = 8.dp, vertical = 6.dp)
+            .testTag("chat.toolGroup.toggle"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(if (row.expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = null, tint = colors.secondaryLabel, modifier = Modifier.size(18.dp))
+        Text(
+            if (row.expanded) "Hide previous ${row.hidden}" else "Show previous ${row.hidden}",
+            color = colors.secondaryLabel,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
+@Composable
+private fun MessageMenuHost(item: TranscriptItem, text: String, onFork: (TranscriptItem) -> Unit, content: @Composable () -> Unit) {
+    val colors = HermexTheme.colors
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    var menu by remember { mutableStateOf(false) }
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = {}, onLongClick = { menu = true }, onLongClickLabel = "Message actions")
+            .testTag("message.${item.id}"),
+    ) {
+        content()
+        DropdownMenu(
+            expanded = menu,
+            onDismissRequest = { menu = false },
+            containerColor = colors.tertiaryBackground,
+            modifier = Modifier.semantics { testTagsAsResourceId = true },
+        ) {
+            DropdownMenuItem(
+                text = { Text("Copy", color = colors.label) },
+                leadingIcon = { Icon(Icons.Outlined.ContentCopy, contentDescription = null, tint = colors.label) },
+                onClick = {
+                    menu = false
+                    scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("message", text))) }
+                },
+                modifier = Modifier.testTag("message.menu.copy"),
+            )
+            DropdownMenuItem(
+                text = { Text("Fork From Here", color = colors.label) },
+                leadingIcon = { Icon(Icons.AutoMirrored.Filled.CallSplit, contentDescription = null, tint = colors.label) },
+                onClick = {
+                    menu = false
+                    onFork(item)
+                },
+                modifier = Modifier.testTag("message.menu.fork"),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SavedCopyNote(onRetry: () -> Unit) {
+    val colors = HermexTheme.colors
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(colors.secondaryBackground)
+            .clickable(onClick = onRetry)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .testTag("chat.savedCopy"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(Icons.Filled.WifiOff, contentDescription = null, tint = colors.secondaryLabel, modifier = Modifier.size(16.dp))
+        Text("Showing saved copy.", color = colors.secondaryLabel, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        Text("Try again", color = colors.accent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun ForkingNote() {
+    val colors = HermexTheme.colors
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).testTag("chat.forking"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+    ) {
+        CircularProgressIndicator(color = colors.secondaryLabel, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
+        Text("Forking conversation…", color = colors.secondaryLabel, fontSize = 13.sp)
     }
 }
 
@@ -387,6 +577,10 @@ private fun RunStatusCapsule(run: RunState) {
         RunState.Stopping -> Triple(CAPTION_STOPPING, null, colors.danger)
         RunState.Reconnecting -> Triple(CAPTION_RECONNECTING, null, colors.secondaryLabel)
     }
+    val spoken = when (run) {
+        is RunState.Working -> CAPTION_WORKING
+        else -> caption
+    }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(run) {
         while (true) {
@@ -403,7 +597,8 @@ private fun RunStatusCapsule(run: RunState) {
             Modifier
                 .glassSurface(CircleShape)
                 .padding(horizontal = 11.dp, vertical = 7.dp)
-                .testTag("chat.runStatus"),
+                .testTag("chat.runStatus")
+                .clearAndSetSemantics { contentDescription = spoken },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(7.dp),
         ) {

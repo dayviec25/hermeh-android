@@ -22,6 +22,7 @@ sealed class HermesFailure(message: String) : Exception(message) {
         HermesFailure("Hermes accepted the sign-in, but the live connection was refused. If a proxy or tunnel sits in front of Hermes, turn on WebSocket support and let the Sec-WebSocket-Protocol header through.")
     class Transport(host: String, cause: Throwable?) : HermesFailure(transportMessage(host, cause))
     class Rpc(val code: Int, message: String) : HermesFailure(message)
+    class Refused(val code: Int, val detail: String) : HermesFailure(detail)
     class SignInExpired : HermesFailure("Your Hermes sign-in expired. Sign in again.")
 
     companion object {

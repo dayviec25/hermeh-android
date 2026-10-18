@@ -36,7 +36,10 @@ data class SessionRow(
     val isActive: Boolean,
     val model: String?,
     val parentSessionId: String?,
+    val cwd: String?,
 )
+
+data class SessionPage(val rows: List<SessionRow>, val total: Int?)
 
 class HermesRest(
     private val client: OkHttpClient,
@@ -99,36 +102,87 @@ class HermesRest(
         return root.str("active")?.takeIf { it.isNotEmpty() } ?: "default"
     }
 
-    suspend fun sessions(profile: String, offset: Int): List<SessionRow> {
-        val query = listOf(
-            "profile" to profile,
-            "order" to "recent",
-            "archived" to "exclude",
-            "limit" to SESSION_PAGE.toString(),
-            "offset" to offset.toString(),
-            "min_messages" to "1",
-            "exclude_sources" to "cron,kanban,oneshot,subagent,tool",
-        )
+    suspend fun sessions(profile: String, offset: Int, limit: Int = SESSION_PAGE, archived: Boolean = false): SessionPage {
+        val query = buildList {
+            add("profile" to profile)
+            add("order" to "recent")
+            add("archived" to if (archived) "only" else "exclude")
+            add("limit" to limit.toString())
+            add("offset" to offset.toString())
+            if (!archived) add("min_messages" to "1")
+            add("exclude_sources" to EXCLUDED_SOURCES)
+        }
         val root = exchange(get(url("api/sessions", query))).obj()
         val rows = root?.get("sessions").arr() ?: throw HermesFailure.Unsupported()
-        return rows.mapNotNull { element ->
+        return SessionPage(rows.mapNotNull { it.obj()?.let(::sessionRow) }, root.long("total")?.toInt())
+    }
+
+    suspend fun searchSessions(query: String, profile: String, limit: Int = 20): List<SessionRow> {
+        val params = listOf(
+            "q" to query,
+            "profile" to profile,
+            "limit" to limit.toString(),
+            "exclude_sources" to EXCLUDED_SOURCES,
+        )
+        val root = exchange(get(url("api/sessions/search", params))).obj()
+        return root.list("results").mapNotNull { element ->
             val row = element.obj() ?: return@mapNotNull null
-            val id = row.str("id") ?: return@mapNotNull null
-            SessionRow(
-                id = id,
-                title = row.str("title"),
-                preview = row.str("preview"),
-                messageCount = row.long("message_count")?.toInt() ?: 0,
-                lastActive = row.double("last_active") ?: row.double("started_at"),
-                profile = row.str("profile") ?: row.str("profile_name"),
-                pinned = row.bool("pinned") ?: false,
-                archived = row.bool("archived") ?: false,
-                unread = row.bool("unread") ?: false,
-                isActive = row.bool("is_active") ?: false,
-                model = row.str("model"),
-                parentSessionId = row.str("parent_session_id"),
-            )
+            sessionRow(row, idKey = if (row.str("session_id") != null) "session_id" else "id")
         }
+    }
+
+    suspend fun updateSession(key: String, profile: String, field: String, value: JsonElement): JsonObject? {
+        requireSegment(key)
+        val body = buildJsonObject {
+            put(field, value)
+            put("profile", profile)
+        }
+        return exchange(request(url("api/sessions/$key")).patch(body.toString().toRequestBody(JSON)).build(), details = true).obj()
+    }
+
+    suspend fun exportSession(key: String, profile: String): JsonObject {
+        requireSegment(key)
+        return exchange(get(url("api/sessions/$key/export", listOf("profile" to profile))), details = true).obj()
+            ?: throw HermesFailure.Unsupported()
+    }
+
+    suspend fun importSessions(body: JsonObject): JsonObject? =
+        exchange(post(url("api/sessions/import"), body), details = true).obj()
+
+    suspend fun profiles(): List<JsonObject> {
+        val root = exchange(get(url("api/profiles"))).obj()
+        return root.list("profiles").mapNotNull { it.obj() }
+    }
+
+    suspend fun fsList(path: String): List<JsonObject> {
+        val root = exchange(get(url("api/fs/list", listOf("path" to path))), details = true).obj()
+        return root.list("entries").mapNotNull { it.obj() }
+    }
+
+    suspend fun fsReadText(path: String): JsonObject =
+        exchange(get(url("api/fs/read-text", listOf("path" to path))), details = true).obj() ?: throw HermesFailure.Unsupported()
+
+    private fun sessionRow(row: JsonObject, idKey: String = "id"): SessionRow? {
+        val id = row.str(idKey) ?: row.str("id") ?: return null
+        return SessionRow(
+            id = id,
+            title = row.str("title"),
+            preview = row.str("preview"),
+            messageCount = row.long("message_count")?.toInt() ?: 0,
+            lastActive = row.double("last_active") ?: row.double("started_at"),
+            profile = row.str("profile") ?: row.str("profile_name"),
+            pinned = row.bool("pinned") ?: false,
+            archived = row.bool("archived") ?: false,
+            unread = row.bool("unread") ?: false,
+            isActive = row.bool("is_active") ?: false,
+            model = row.str("model"),
+            parentSessionId = row.str("parent_session_id"),
+            cwd = row.str("cwd"),
+        )
+    }
+
+    private fun requireSegment(key: String) {
+        if (key.isEmpty() || !key.all { it.isLetterOrDigit() || it == '_' || it == '-' }) throw HermesFailure.InvalidAddress()
     }
 
     suspend fun messages(key: String, profile: String, offset: Int): List<JsonObject> {
@@ -154,17 +208,17 @@ class HermesRest(
         return builder
     }
 
-    private suspend fun exchange(request: Request, publicProbe: Boolean = false): JsonElement? =
+    private suspend fun exchange(request: Request, publicProbe: Boolean = false, details: Boolean = false): JsonElement? =
         withContext(Dispatchers.IO) {
             val response = try {
                 client.newCall(request).execute()
             } catch (error: java.io.IOException) {
                 throw HermesFailure.Transport(host, error)
             }
-            response.use { handle(it, publicProbe) }
+            response.use { handle(it, publicProbe, details) }
         }
 
-    private fun handle(response: Response, publicProbe: Boolean): JsonElement? {
+    private fun handle(response: Response, publicProbe: Boolean, details: Boolean = false): JsonElement? {
         val text = response.body?.string().orEmpty()
         val parsed = runCatching { HermesJson.parseToJsonElement(text) }.getOrNull()
         val code = response.code
@@ -179,6 +233,10 @@ class HermesRest(
                 else -> throw HermesFailure.Rejected(code, host)
             }
         }
+        if (details && code in 400..499 && code != 401) {
+            val detail = parsed.obj()?.let { it.str("detail") ?: it.child("detail").str("error") ?: it.str("error") }
+            if (!detail.isNullOrBlank()) throw HermesFailure.Refused(code, detail)
+        }
         if (code !in 200..299) throw HermesFailure.Rejected(code, host)
         return parsed
     }
@@ -186,6 +244,8 @@ class HermesRest(
     companion object {
         const val SESSION_PAGE = 100
         const val TRANSCRIPT_PAGE = 100
+        const val HOME_PAGE = 50
+        private const val EXCLUDED_SOURCES = "cron,kanban,oneshot,subagent,tool"
         private val JSON = "application/json".toMediaType()
 
         fun normalize(input: String): HttpUrl? {

@@ -45,7 +45,44 @@ data class SessionSummary(
     val isActive: Boolean,
     val model: String?,
     val parentKey: StoredKey?,
+    val cwd: String? = null,
 )
+
+data class ProfileSummary(
+    val name: ProfileName,
+    val displayName: String,
+    val model: String?,
+    val isDefault: Boolean,
+)
+
+data class ProjectLane(
+    val id: String,
+    val label: String,
+    val color: String?,
+    val path: String?,
+    val isAuto: Boolean,
+    val sessionKeys: Set<StoredKey>,
+    val sessionCount: Int,
+)
+
+sealed interface DeleteOutcome {
+    data object Deleted : DeleteOutcome
+    data object BusyHere : DeleteOutcome
+    data object OpenElsewhere : DeleteOutcome
+}
+
+data class DuplicateResult(val key: StoredKey, val title: String?)
+
+data class BranchResult(val key: StoredKey, val title: String?)
+
+data class FileEntry(val name: String, val path: String, val isDirectory: Boolean)
+
+sealed interface FilePreview {
+    val path: String
+
+    data class Text(override val path: String, val text: String, val truncated: Boolean, val byteSize: Long?, val language: String?) : FilePreview
+    data class Binary(override val path: String, val byteSize: Long?) : FilePreview
+}
 
 enum class NoticeKind { Error, Interrupted }
 

@@ -1,6 +1,14 @@
 package com.hermex.android.core.data
 
+import com.hermex.android.core.data.db.TranscriptDao
+import com.hermex.android.core.data.db.TranscriptRowEntity
 import com.hermex.android.core.model.ApprovalChoice
+import com.hermex.android.core.model.AuthState
+import com.hermex.android.core.model.BranchResult
+import com.hermex.android.core.network.HermesFailure
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 import com.hermex.android.core.model.ProfileName
 import com.hermex.android.core.model.RuntimeId
 import com.hermex.android.core.model.StoredKey
@@ -33,6 +41,7 @@ data class AttachedSession(
     val model: String?,
     val provider: String?,
     val title: String?,
+    val cwd: String? = null,
 )
 
 data class ModelOption(val id: String, val provider: String, val providerName: String)
@@ -44,12 +53,52 @@ data class Replay(val latestSeq: Long, val events: List<GatewayEnvelope>)
 class ChatRepository(
     private val auth: AuthRepository,
     private val gateway: HermesGateway,
+    private val cache: TranscriptDao,
 ) {
     val events: Flow<GatewayEnvelope> get() = gateway.events
     val status get() = gateway.status
 
+    private val runtimes: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    val attachedRuntimes: Set<String> get() = runtimes.toSet()
+
+    fun forgetRuntime(runtime: String) {
+        runtimes.remove(runtime)
+    }
+
+    private fun serverId(): String? = (auth.state.value as? AuthState.SignedIn)?.server?.id
+
+    suspend fun cachedHistory(key: StoredKey): List<TranscriptItem> {
+        val server = serverId() ?: return emptyList()
+        val rows = cache.rows(server, key.value).mapNotNull { entity ->
+            runCatching { HermesJson.parseToJsonElement(entity.json) }.getOrNull().obj()
+        }
+        return withContext(Dispatchers.Default) { mapHistory(rows) }
+    }
+
     suspend fun history(key: StoredKey, profile: ProfileName): List<TranscriptItem> {
-        val rows = auth.authorized { rest ->
+        val rows = fetchRows(key, profile)
+        serverId()?.let { server ->
+            val entities = rows.mapIndexed { index, row ->
+                TranscriptRowEntity(server, key.value, rowKey(row, index), index, row.toString())
+            }
+            cache.replace(server, key.value, entities)
+        }
+        return withContext(Dispatchers.Default) { mapHistory(rows) }
+    }
+
+    suspend fun branch(runtime: RuntimeId, count: Int?): BranchResult {
+        val result = gateway.call("session.branch", buildJsonObject {
+            put("session_id", runtime.value)
+            if (count != null) put("count", count)
+        }).obj()
+        val key = result.str("stored_session_id")?.takeIf { it.isNotEmpty() } ?: throw HermesFailure.Unsupported()
+        result.str("session_id")?.let(runtimes::add)
+        return BranchResult(StoredKey(key), result.str("title"))
+    }
+
+    private suspend fun fetchRows(key: StoredKey, profile: ProfileName): List<JsonObject> {
+        return auth.authorized { rest ->
             val pages = ArrayDeque<List<JsonObject>>()
             var offset = 0
             while (true) {
@@ -60,8 +109,11 @@ class ChatRepository(
             }
             pages.flatten()
         }
-        return mapHistory(rows)
     }
+
+    private fun rowKey(row: JsonObject, index: Int): String =
+        row.long("id")?.toString() ?: row.long("row_id")?.toString() ?: "i$index"
+
 
     suspend fun create(profile: ProfileName, model: String?, provider: String?): AttachedSession {
         val result = gateway.call("session.create", buildJsonObject {
@@ -80,7 +132,8 @@ class ChatRepository(
             model = info.str("model"),
             provider = info.str("provider"),
             title = info.str("title"),
-        )
+            cwd = info.str("cwd"),
+        ).also { runtimes.add(it.runtime.value) }
     }
 
     suspend fun resume(key: StoredKey, profile: ProfileName): AttachedSession {
@@ -99,7 +152,8 @@ class ChatRepository(
             model = info.str("model"),
             provider = info.str("provider"),
             title = info.str("title") ?: result.str("title"),
-        )
+            cwd = info.str("cwd"),
+        ).also { runtimes.add(it.runtime.value) }
     }
 
     suspend fun eventsSince(runtime: RuntimeId, lastSeen: Long): Replay {

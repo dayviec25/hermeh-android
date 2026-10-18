@@ -24,6 +24,7 @@ data class ChatState(
     val provider: String? = null,
     val reasoning: String? = null,
     val storedKey: String? = null,
+    val cwd: String? = null,
     val nextLocalId: Long = 0,
 ) {
     val isRunning: Boolean get() = run != RunState.Idle && run != RunState.Reconnecting || hostRunning
@@ -209,6 +210,7 @@ private fun ChatState.info(event: GatewayEvent.SessionInfo, now: Instant): ChatS
         reasoning = event.reasoningEffort ?: reasoning,
         title = event.title?.takeIf { it.isNotBlank() } ?: title,
         storedKey = event.storedKey ?: storedKey,
+        cwd = event.cwd?.takeIf { it.isNotBlank() } ?: cwd,
     )
     val running = event.running ?: return next
     next = next.copy(hostRunning = running)
